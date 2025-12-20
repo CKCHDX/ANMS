@@ -15,6 +15,10 @@
     <!-- Phone Permissions -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
+    
+    <!-- Foreground Service -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
 
     <application
         android:allowBackup="true"
@@ -43,6 +47,12 @@
                 <action android:name="android.provider.Telephony.SMS_RECEIVED" />
             </intent-filter>
         </receiver>
+        
+        <!-- SMS Listener Service -->
+        <service
+            android:name=".SMSListenerService"
+            android:enabled="true"
+            android:exported="false" />
 
     </application>
 
