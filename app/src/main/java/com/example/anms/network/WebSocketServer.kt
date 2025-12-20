@@ -86,7 +86,7 @@ class WebSocketServer(
             while (isRunning && !clientSocket.isClosed) {
                 val message = readWebSocketFrame(reader)
                 if (message != null) {
-                    Log.d(tag, "Message: $message")
+                    Log.d(tag, "Raw message: '$message'")
                     handleCommand(message, output)
                     onMessageReceived(message)
                 } else {
@@ -110,27 +110,49 @@ class WebSocketServer(
     
     private fun handleCommand(message: String, output: OutputStream) {
         try {
-            val parts = message.split("|", limit = 3)
+            Log.d(tag, "Handling command: $message")
+            
             when {
                 message.startsWith("GET_SMS_HISTORY:") -> {
                     val phoneNumber = message.substring(16).trim()
-                    Log.d(tag, "Retrieving SMS history for $phoneNumber")
-                    val history = smsManager.formatSMSHistoryForWeb(phoneNumber)
-                    sendWebSocketFrame(output, "SMS_HISTORY|$history")
+                    Log.d(tag, "Retrieving SMS history for: '$phoneNumber'")
+                    try {
+                        val history = smsManager.formatSMSHistoryForWeb(phoneNumber)
+                        Log.d(tag, "SMS history: $history")
+                        sendWebSocketFrame(output, "SMS_HISTORY|$history")
+                    } catch (e: Exception) {
+                        Log.e(tag, "Error formatting SMS history", e)
+                        sendWebSocketFrame(output, "SMS_ERROR|Failed to retrieve history")
+                    }
                 }
-                parts.size >= 3 && parts[0] == "SEND_SMS" -> {
-                    val phoneNumber = parts[1]
-                    val smsText = parts[2]
-                    Log.d(tag, "Sending SMS to $phoneNumber: $smsText")
-                    val success = smsManager.sendSMS(phoneNumber, smsText)
-                    val response = if (success) "SMS_SENT|$phoneNumber|OK" else "SMS_ERROR|$phoneNumber|Failed"
-                    sendWebSocketFrame(output, response)
-                    // Also broadcast to all clients
-                    broadcastMessage("SMS|$phoneNumber|$smsText|sent")
+                message.contains("SEND_SMS") && message.contains("|") -> {
+                    val parts = message.split("|")
+                    if (parts.size >= 3) {
+                        val phoneNumber = parts[1].trim()
+                        val smsText = parts.drop(2).joinToString("|").trim()
+                        Log.d(tag, "Sending SMS to '$phoneNumber': '$smsText'")
+                        try {
+                            val success = smsManager.sendSMS(phoneNumber, smsText)
+                            val response = if (success) "SMS_SENT|$phoneNumber|OK" else "SMS_ERROR|$phoneNumber|Failed"
+                            sendWebSocketFrame(output, response)
+                            // Broadcast
+                            broadcastMessage("SMS|$phoneNumber|$smsText|sent")
+                        } catch (e: Exception) {
+                            Log.e(tag, "Error sending SMS", e)
+                            sendWebSocketFrame(output, "SMS_ERROR|Exception: ${e.message}")
+                        }
+                    } else {
+                        Log.e(tag, "Invalid SEND_SMS format: $message")
+                    }
+                }
+                else -> {
+                    // Regular message - broadcast to all clients
+                    Log.d(tag, "Broadcasting message: $message")
+                    broadcastMessage(message)
                 }
             }
         } catch (e: Exception) {
-            Log.e(tag, "Error handling command", e)
+            Log.e(tag, "Error handling command: $message", e)
         }
     }
     
@@ -221,6 +243,7 @@ class WebSocketServer(
             System.arraycopy(data, 0, frame, index, data.size)
             output.write(frame, 0, index + data.size)
             output.flush()
+            Log.d(tag, "Sent WebSocket frame: $message")
         } catch (e: Exception) {
             Log.e(tag, "Error sending WebSocket frame", e)
         }
@@ -228,6 +251,7 @@ class WebSocketServer(
     
     private fun broadcastMessage(message: String) {
         synchronized(clients) {
+            Log.d(tag, "Broadcasting to ${clients.size} clients: $message")
             clients.forEach { client ->
                 try {
                     sendWebSocketFrame(client.output, message)
