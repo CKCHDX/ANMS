@@ -12,24 +12,30 @@ class SmsReceiver : BroadcastReceiver() {
     private val tag = "ANMS_SmsReceiver"
 
     override fun onReceive(context: Context, intent: Intent) {
-        Log.d(tag, "SMS received")
+        Log.d(tag, "SMS BroadcastReceiver triggered")
         
         if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
             val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
             for (message in messages) {
-                val phoneNumber = message.originatingAddress ?: ""
+                val phoneNumber = message.originatingAddress ?: "Unknown"
                 val messageText = message.messageBody ?: ""
                 
                 Log.d(tag, "SMS from $phoneNumber: $messageText")
                 
                 // Broadcast to connected WebSocket clients
                 thread {
-                    wsServer?.broadcastIncomingSMS(phoneNumber, messageText)
+                    try {
+                        globalWebSocketServer?.broadcastIncomingSMS(phoneNumber, messageText)
+                        Log.d(tag, "Broadcasted to WebSocket")
+                    } catch (e: Exception) {
+                        Log.e(tag, "Error broadcasting", e)
+                    }
                 }
             }
         }
     }
     
     companion object {
-        var wsServer: WebSocketServer? = null
+        var globalWebSocketServer: WebSocketServer? = null
     }
+}
