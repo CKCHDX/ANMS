@@ -65,14 +65,8 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
 
             val response = when {
                 path == "/" -> sendHtmlResponse(getHtml())
-                path.startsWith("/api/chat/") -> {
-                    val phone = URLDecoder.decode(path.substring(10), "UTF-8")
-                    Log.d(tag, "=== CHAT REQUEST ===")
-                    Log.d(tag, "Raw phone: $phone")
-                    handleGetChat(phone)
-                }
                 path.startsWith("/api/messages/") -> {
-                    // New pagination endpoint: /api/messages/{phone}?offset=0&limit=50
+                    // Pagination endpoint: /api/messages/{phone}?offset=0&limit=50
                     val pathParts = path.substring(14).split("?")
                     val phone = URLDecoder.decode(pathParts[0], "UTF-8")
                     val queryString = pathParts.getOrNull(1) ?: ""
@@ -99,28 +93,6 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             try {
                 clientSocket.close()
             } catch (e: Exception) {}
-        }
-    }
-
-    private fun handleGetChat(phone: String): String {
-        return try {
-            Log.d(tag, "Loading chat for: $phone")
-            val messages = smsDb.getConversation(phone, 500)
-            Log.d(tag, "Got ${messages.size} messages")
-
-            val json = messages.joinToString(",") { msg ->
-                val dir = if (msg.type == 1) "in" else "out"
-                val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(msg.timestamp)
-                val cleanBody = msg.body.replace("\\", " ").replace("\"", "\\\"")
-                """{"body":"$cleanBody","dir":"$dir","time":"$time"}"""
-            }
-
-            val body = "[$json]"
-            val contentLength = body.toByteArray().size
-            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: $contentLength\r\nConnection: close\r\n\r\n$body"
-        } catch (e: Exception) {
-            Log.e(tag, "Error loading chat: ${e.message}", e)
-            jsonResponse(false, "Error: ${e.message}")
         }
     }
 
@@ -1029,7 +1001,7 @@ function loadChat(phone) {
     console.log('Loading chat for:', phone);
     updateStatus('⏳ Loading...');
     
-    // Load last MESSAGES_PER_LOAD messages
+    // Load last MESSAGES_PER_LOAD messages from the end
     return fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(phone) + '?offset=0&limit=' + MESSAGES_PER_LOAD)
         .then(r => {
             console.log('Response status:', r.status);
