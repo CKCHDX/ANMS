@@ -1,6 +1,7 @@
 package com.example.anms
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -43,6 +44,7 @@ class MainActivity : AppCompatActivity() {
         initViews()
         setupButtons()
         startUptimeTimer()
+        startSMSService()
     }
     
     private fun requestPermissions() {
@@ -54,6 +56,7 @@ class MainActivity : AppCompatActivity() {
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             permissions.add(Manifest.permission.READ_PHONE_NUMBERS)
+            permissions.add(Manifest.permission.FOREGROUND_SERVICE)
         }
         
         val missingPerms = permissions.filter { perm ->
@@ -63,6 +66,16 @@ class MainActivity : AppCompatActivity() {
         if (missingPerms.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, missingPerms.toTypedArray(), permissionRequestCode)
         }
+    }
+    
+    private fun startSMSService() {
+        val serviceIntent = Intent(this, SMSListenerService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
+        Log.d(tag, "SMS Listener Service started")
     }
     
     private fun initViews() {
@@ -95,7 +108,7 @@ class MainActivity : AppCompatActivity() {
                 // Start WebSocket server (for incoming SMS)
                 wsServer = WebSocketServer(8765)
                 wsServer?.start()
-                SmsReceiver.wsServer = wsServer // Set reference for SMS receiver
+                SmsReceiver.globalWebSocketServer = wsServer // Set reference for SMS receiver
                 Log.d(tag, "WebSocket Server started on port 8765")
                 Thread.sleep(500)
                 
@@ -127,7 +140,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 httpServer?.stopServer()
                 wsServer?.stopServer()
-                SmsReceiver.wsServer = null
+                SmsReceiver.globalWebSocketServer = null
                 isServerRunning = false
                 messageCount = 0
                 
