@@ -118,13 +118,16 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 val dir = if (msg.type == 1) "in" else "out"
                 val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(msg.timestamp)
                 val cleanBody = msg.body.replace("\\", " ").replace("\"", "\\\"")
-                """{"body":"$cleanBody","dir":"$dir","time":"$time"}"""
+                
+                "{\"body\":\"$cleanBody\",\"dir\":\"$dir\",\"time\":\"$time\"}"
             }
 
             val hasMore = (allMessages.size - offset - limit) > 0
-            val body = """{"messages":[$json],"total":${allMessages.size},"offset":$offset,"limit":$limit,"hasMore":$hasMore}"""
+            val body = "{\"messages\":[$json],\"total\":${allMessages.size},\"offset\":$offset,\"limit\":$limit,\"hasMore\":$hasMore}"
             val contentLength = body.toByteArray().size
-            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: $contentLength\r\nConnection: close\r\n\r\n$body"
+            
+            // NO-CACHE headers to ensure fresh data every time
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: $contentLength\r\nCache-Control: no-store, no-cache, must-revalidate, max-age=0\r\nPragma: no-cache\r\nExpires: 0\r\nConnection: close\r\n\r\n$body"
         } catch (e: Exception) {
             Log.e(tag, "Error loading messages: ${e.message}", e)
             jsonResponse(false, "Error: ${e.message}")
@@ -157,14 +160,14 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
     }
 
     private fun jsonResponse(success: Boolean, message: String): String {
-        val json = """{"success":$success,"message":"$message"}"""
+        val json = "{\"success\":$success,\"message\":\"$message\"}"
         val contentLength = json.toByteArray().size
-        return "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: $contentLength\r\nConnection: close\r\n\r\n$json"
+        return "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: $contentLength\r\nCache-Control: no-store, no-cache, must-revalidate, max-age=0\r\nPragma: no-cache\r\nExpires: 0\r\nConnection: close\r\n\r\n$json"
     }
 
     private fun sendHtmlResponse(html: String): String {
         val contentLength = html.toByteArray().size
-        return "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: $contentLength\r\nConnection: close\r\n\r\n$html"
+        return "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: $contentLength\r\nCache-Control: no-store, no-cache, must-revalidate, max-age=0\r\nPragma: no-cache\r\nExpires: 0\r\nConnection: close\r\n\r\n$html"
     }
 
     private fun sendNotFound(): String {
@@ -1000,7 +1003,15 @@ function loadChat(phone) {
     updateStatus('⏳ Loading...');
     
     // Always fetch the LATEST messages (offset=0)
-    return fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(phone) + '?offset=0&limit=' + MESSAGES_PER_LOAD)
+    // Add timestamp to bust cache
+    const ts = Date.now();
+    return fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(phone) + '?offset=0&limit=' + MESSAGES_PER_LOAD + '&_t=' + ts, {
+        method: 'GET',
+        headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+        }
+    })
         .then(r => {
             console.log('Response status:', r.status);
             if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1033,7 +1044,15 @@ function pollChat(phone) {
     // Poll for new messages
     console.log('Polling for:', phone);
     
-    fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(phone) + '?offset=0&limit=' + MESSAGES_PER_LOAD)
+    // Add timestamp to bust cache
+    const ts = Date.now();
+    fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(phone) + '?offset=0&limit=' + MESSAGES_PER_LOAD + '&_t=' + ts, {
+        method: 'GET',
+        headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+        }
+    })
         .then(r => {
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.json();
@@ -1117,7 +1136,15 @@ function loadOlderMessages() {
     
     console.log('Loading older messages: offset=' + state.offset);
     
-    fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(active) + '?offset=' + state.offset + '&limit=' + MESSAGES_PER_LOAD)
+    // Add timestamp to bust cache
+    const ts = Date.now();
+    fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(active) + '?offset=' + state.offset + '&limit=' + MESSAGES_PER_LOAD + '&_t=' + ts, {
+        method: 'GET',
+        headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+        }
+    })
         .then(r => r.json())
         .then(data => {
             console.log('Loaded', data.messages.length, 'older messages');
@@ -1187,7 +1214,7 @@ function renderContacts() {
     const html = contacts.map(p => {
         const cnt = (chats[p] || []).length;
         const cls = active === p ? 'active' : '';
-        return '<div class="contact-item ' + cls + '" onclick="selectContact(\'' + p.replace(/'/g, "\\\\'") + '\')"><div class="contact-number">' + escapeHtml(p) + '</div><div class="contact-count">' + cnt + ' messages</div></div>';
+        return '<div class="contact-item ' + cls + '" onclick="selectContact(\'' + p.replace(/'/g, "\\\\'") + '\'"><div class="contact-number">' + escapeHtml(p) + '</div><div class="contact-count">' + cnt + ' messages</div></div>';
     }).join('');
     document.getElementById('contacts').innerHTML = html || '<div style="color: #666; text-align: center; padding: 20px; font-size: 12px;">No contacts yet</div>';
 }
