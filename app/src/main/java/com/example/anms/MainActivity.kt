@@ -13,6 +13,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.anms.network.HttpServer
 import com.example.anms.network.WebSocketServer
+import com.example.anms.sms.SmsCache
 import com.example.anms.sms.SmsReceiver
 import kotlin.concurrent.thread
 
@@ -22,6 +23,7 @@ class MainActivity : AppCompatActivity() {
     
     private var httpServer: HttpServer? = null
     private var wsServer: WebSocketServer? = null
+    private var smsCache: SmsCache? = null
     private var isServerRunning = false
     private var startTime: Long = 0
     private var messageCount = 0
@@ -42,6 +44,8 @@ class MainActivity : AppCompatActivity() {
             initViews()
             setupButtons()
             requestPermissions()
+            smsCache = SmsCache(this)
+            smsCache?.loadInitialSms()
             startUptimeTimer()
             startSMSService()
         } catch (e: Exception) {
@@ -158,12 +162,12 @@ class MainActivity : AppCompatActivity() {
                 // Start WebSocket server (for incoming SMS)
                 wsServer = WebSocketServer(8765)
                 wsServer?.start()
-                SmsReceiver.globalWebSocketServer = wsServer // Set reference for SMS receiver
+                SmsReceiver.globalWebSocketServer = wsServer
                 Log.d(tag, "WebSocket Server started on port 8765")
                 Thread.sleep(500)
                 
                 // Start HTTP server (for sending SMS)
-                httpServer = HttpServer(this@MainActivity, 8080, wsServer)
+                httpServer = HttpServer(this@MainActivity, 8080, wsServer, smsCache)
                 httpServer?.start()
                 Log.d(tag, "HTTP Server started on port 8080")
                 
