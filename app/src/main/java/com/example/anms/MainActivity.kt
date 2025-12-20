@@ -29,6 +29,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var messageCountText: TextView
     private lateinit var uptimeText: TextView
+    private lateinit var permStatusText: TextView
     private lateinit var startBtn: Button
     private lateinit var stopBtn: Button
     private lateinit var restartBtn: Button
@@ -38,9 +39,9 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         
         try {
-            requestPermissions()
             initViews()
             setupButtons()
+            requestPermissions()
             startUptimeTimer()
             startSMSService()
         } catch (e: Exception) {
@@ -64,9 +65,45 @@ class MainActivity : AppCompatActivity() {
             ContextCompat.checkSelfPermission(this, perm) != PackageManager.PERMISSION_GRANTED
         }
         
+        Log.d(tag, "Checking permissions: ${permissions.size} total, ${missingPerms.size} missing")
+        missingPerms.forEach { Log.d(tag, "  Missing: $it") }
+        
         if (missingPerms.isNotEmpty()) {
+            Log.d(tag, "Requesting ${missingPerms.size} permissions...")
             ActivityCompat.requestPermissions(this, missingPerms.toTypedArray(), permissionRequestCode)
+        } else {
+            Log.d(tag, "All permissions already granted")
+            updatePermissionStatus()
         }
+    }
+    
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == permissionRequestCode) {
+            Log.d(tag, "Permission result received")
+            permissions.forEachIndexed { i, perm ->
+                val granted = grantResults[i] == PackageManager.PERMISSION_GRANTED
+                Log.d(tag, "  $perm: $granted")
+            }
+            updatePermissionStatus()
+        }
+    }
+    
+    private fun updatePermissionStatus() {
+        val readSms = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
+        val sendSms = ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
+        val receiveSms = ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
+        
+        val status = when {
+            readSms && sendSms && receiveSms -> "✓ SMS permissions granted"
+            readSms && sendSms -> "⚠ Missing RECEIVE_SMS"
+            readSms && receiveSms -> "⚠ Missing SEND_SMS"
+            readSms -> "⚠ Missing SEND/RECEIVE_SMS"
+            else -> "✗ READ_SMS permission DENIED - Cannot read messages!"
+        }
+        
+        Log.d(tag, status)
+        permStatusText.text = status
     }
     
     private fun startSMSService() {
@@ -88,6 +125,7 @@ class MainActivity : AppCompatActivity() {
             statusText = findViewById(R.id.statusText)
             messageCountText = findViewById(R.id.messageCountText)
             uptimeText = findViewById(R.id.uptimeText)
+            permStatusText = findViewById(R.id.permStatusText)
             
             startBtn = findViewById(R.id.startServerButton)
             stopBtn = findViewById(R.id.stopServerButton)
