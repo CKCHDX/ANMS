@@ -1,9 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">ANMS</string>
-    <string name="server_status">Server Status</string>
+    <string name="initializing">Initializing...</string>
+    <string name="server_running">WebSocket Server Running (Port 8765)</string>
+    <string name="server_stopped">Server Stopped</string>
     <string name="messages">Messages</string>
     <string name="phone_number">Phone Number</string>
-    <string name="message">Message</string>
+    <string name="message_hint">Message</string>
     <string name="send_sms">Send SMS</string>
+    <string name="message_sent">Message sent</string>
+    <string name="permission_denied">Permission denied</string>
+    <string name="permission_required_sms">SMS permission required</string>
+    <string name="permissions_required">SMS and network permissions required</string>
+    <string name="fill_all_fields">Please fill in all fields</string>
 </resources>

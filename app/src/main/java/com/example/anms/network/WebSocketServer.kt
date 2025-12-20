@@ -7,7 +7,6 @@ import org.java_websocket.WebSocket
 import org.java_websocket.handshake.ClientHandshake
 import org.java_websocket.server.WebSocketServer
 import java.net.InetSocketAddress
-import java.nio.charset.StandardCharsets
 import kotlin.concurrent.thread
 
 class WebSocketServer(
@@ -17,7 +16,7 @@ class WebSocketServer(
 ) : WebSocketServer(InetSocketAddress(port)) {
 
     private val connections = mutableSetOf<WebSocket>()
-    private val tag = "WebSocketServer"
+    private val tag = "ANMS_WebSocket"
 
     override fun onOpen(conn: WebSocket, handshake: ClientHandshake) {
         connections.add(conn)
@@ -49,7 +48,11 @@ class WebSocketServer(
             }
         } catch (e: Exception) {
             Log.e(tag, "Error processing message: $message", e)
-            conn.send("ERROR")
+            try {
+                conn.send("ERROR")
+            } catch (e: Exception) {
+                Log.e(tag, "Error sending error response", e)
+            }
         }
     }
 
@@ -63,24 +66,25 @@ class WebSocketServer(
 
     fun broadcastMessage(message: Message) {
         val payload = "${message.phoneNumber}|${message.content}|${message.timestamp}|${message.isOutgoing}"
-        connections.forEach { conn ->
+        val iterator = connections.iterator()
+        while (iterator.hasNext()) {
+            val conn = iterator.next()
             try {
                 conn.send(payload)
             } catch (e: Exception) {
                 Log.e(tag, "Error broadcasting to client", e)
+                iterator.remove()
             }
         }
     }
 
-    fun stop(callback: (Boolean) -> Unit = {}) {
+    fun stopServer() {
         thread {
             try {
                 super.stop()
-                callback(false)
                 Log.d(tag, "WebSocket server stopped")
             } catch (e: Exception) {
                 Log.e(tag, "Error stopping server", e)
-                callback(true)
             }
         }
     }

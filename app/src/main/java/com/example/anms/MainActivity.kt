@@ -28,7 +28,7 @@ class MainActivity : AppCompatActivity() {
         } else {
             Toast.makeText(
                 this,
-                "SMS and network permissions required",
+                getString(R.string.permissions_required),
                 Toast.LENGTH_SHORT
             ).show()
         }
@@ -81,23 +81,32 @@ class MainActivity : AppCompatActivity() {
             val message = binding.messageInput.text.toString().trim()
 
             if (phoneNumber.isNotEmpty() && message.isNotEmpty()) {
-                smsManager.sendSms(phoneNumber, message)
-                messageAdapter.addMessage(
-                    Message(
-                        phoneNumber = phoneNumber,
-                        content = message,
-                        timestamp = System.currentTimeMillis(),
-                        isOutgoing = true
-                    )
-                )
-                binding.messageInput.text.clear()
-                binding.messagesRecyclerView.scrollToPosition(messageAdapter.itemCount - 1)
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) {
+                    try {
+                        smsManager.sendSms(phoneNumber, message)
+                        messageAdapter.addMessage(
+                            Message(
+                                phoneNumber = phoneNumber,
+                                content = message,
+                                timestamp = System.currentTimeMillis(),
+                                isOutgoing = true
+                            )
+                        )
+                        binding.messageInput.text.clear()
+                        binding.messagesRecyclerView.scrollToPosition(messageAdapter.itemCount - 1)
+                        Toast.makeText(this, getString(R.string.message_sent), Toast.LENGTH_SHORT).show()
+                    } catch (e: SecurityException) {
+                        Toast.makeText(this, getString(R.string.permission_denied), Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    Toast.makeText(this, getString(R.string.permission_required_sms), Toast.LENGTH_SHORT).show()
+                }
             } else {
-                Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.fill_all_fields), Toast.LENGTH_SHORT).show()
             }
         }
 
-        binding.serverStatusTextView.text = "Initializing..."
+        binding.serverStatusTextView.text = getString(R.string.initializing)
     }
 
     private fun initializeApp() {
@@ -108,25 +117,26 @@ class MainActivity : AppCompatActivity() {
         }
 
         webSocketServer = WebSocketServer(this, 8765) { clientMessage ->
-            smsManager.sendSms(clientMessage.phoneNumber, clientMessage.content)
-            messageAdapter.addMessage(
-                Message(
-                    phoneNumber = clientMessage.phoneNumber,
-                    content = clientMessage.content,
-                    timestamp = System.currentTimeMillis(),
-                    isOutgoing = true
-                )
-            )
-            binding.messagesRecyclerView.scrollToPosition(messageAdapter.itemCount - 1)
-        }
-
-        webSocketServer.start { isRunning ->
-            binding.serverStatusTextView.text = if (isRunning) {
-                "WebSocket Server Running (Port 8765)"
-            } else {
-                "Server Stopped"
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) {
+                try {
+                    smsManager.sendSms(clientMessage.phoneNumber, clientMessage.content)
+                    messageAdapter.addMessage(
+                        Message(
+                            phoneNumber = clientMessage.phoneNumber,
+                            content = clientMessage.content,
+                            timestamp = System.currentTimeMillis(),
+                            isOutgoing = true
+                        )
+                    )
+                    binding.messagesRecyclerView.scrollToPosition(messageAdapter.itemCount - 1)
+                } catch (e: SecurityException) {
+                    e.printStackTrace()
+                }
             }
         }
+
+        webSocketServer.start()
+        binding.serverStatusTextView.text = getString(R.string.server_running)
     }
 
     override fun onDestroy() {
