@@ -18,7 +18,8 @@ class SmsReceiver(
                 Telephony.Sms.Intents.getMessagesFromIntent(intent)
             } else {
                 @Suppress("DEPRECATION")
-                intent.getParcelableArrayExtra("pdus")?.mapNotNull { pdu ->
+                val pdus = intent.getParcelableArrayExtra("pdus") as? Array<*>
+                pdus?.mapNotNull { pdu ->
                     try {
                         @Suppress("DEPRECATION")
                         android.telephony.SmsMessage.createFromPdu(pdu as ByteArray)
