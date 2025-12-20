@@ -33,4 +33,3 @@ class SmsReceiver : BroadcastReceiver() {
     companion object {
         var wsServer: WebSocketServer? = null
     }
-}
