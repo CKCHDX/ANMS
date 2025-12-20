@@ -13,8 +13,6 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.anms.network.HttpServer
 import com.example.anms.network.WebSocketServer
-import com.example.anms.sms.SmsCache
-import com.example.anms.sms.SmsReceiver
 import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
@@ -23,18 +21,14 @@ class MainActivity : AppCompatActivity() {
     
     private var httpServer: HttpServer? = null
     private var wsServer: WebSocketServer? = null
-    private var smsCache: SmsCache? = null
     private var isServerRunning = false
     private var startTime: Long = 0
-    private var messageCount = 0
     
     private lateinit var statusText: TextView
-    private lateinit var messageCountText: TextView
     private lateinit var uptimeText: TextView
     private lateinit var permStatusText: TextView
     private lateinit var startBtn: Button
     private lateinit var stopBtn: Button
-    private lateinit var restartBtn: Button
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,7 +38,6 @@ class MainActivity : AppCompatActivity() {
             initViews()
             setupButtons()
             requestPermissions()
-            smsCache = SmsCache(this)
             startUptimeTimer()
             startSMSService()
         } catch (e: Exception) {
@@ -69,7 +62,6 @@ class MainActivity : AppCompatActivity() {
         }
         
         Log.d(tag, "Checking permissions: ${permissions.size} total, ${missingPerms.size} missing")
-        missingPerms.forEach { Log.d(tag, "  Missing: $it") }
         
         if (missingPerms.isNotEmpty()) {
             Log.d(tag, "Requesting ${missingPerms.size} permissions...")
@@ -84,10 +76,6 @@ class MainActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == permissionRequestCode) {
             Log.d(tag, "Permission result received")
-            permissions.forEachIndexed { i, perm ->
-                val granted = grantResults[i] == PackageManager.PERMISSION_GRANTED
-                Log.d(tag, "  $perm: $granted")
-            }
             updatePermissionStatus()
         }
     }
@@ -99,10 +87,7 @@ class MainActivity : AppCompatActivity() {
         
         val status = when {
             readSms && sendSms && receiveSms -> "✓ SMS permissions granted"
-            readSms && sendSms -> "⚠ Missing RECEIVE_SMS"
-            readSms && receiveSms -> "⚠ Missing SEND_SMS"
-            readSms -> "⚠ Missing SEND/RECEIVE_SMS"
-            else -> "✗ READ_SMS permission DENIED - Cannot read messages!"
+            else -> "✗ Missing SMS permissions"
         }
         
         Log.d(tag, status)
@@ -124,30 +109,18 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun initViews() {
-        try {
-            statusText = findViewById(R.id.statusText)
-            messageCountText = findViewById(R.id.messageCountText)
-            uptimeText = findViewById(R.id.uptimeText)
-            permStatusText = findViewById(R.id.permStatusText)
-            
-            startBtn = findViewById(R.id.startServerButton)
-            stopBtn = findViewById(R.id.stopServerButton)
-            restartBtn = findViewById(R.id.restartServerButton)
-            
-            updateStatusUI()
-        } catch (e: Exception) {
-            Log.e(tag, "Error initializing views", e)
-        }
+        statusText = findViewById(R.id.statusText)
+        uptimeText = findViewById(R.id.uptimeText)
+        permStatusText = findViewById(R.id.permStatusText)
+        startBtn = findViewById(R.id.startServerButton)
+        stopBtn = findViewById(R.id.stopServerButton)
+        
+        updateStatusUI()
     }
     
     private fun setupButtons() {
-        try {
-            startBtn.setOnClickListener { startServer() }
-            stopBtn.setOnClickListener { stopServer() }
-            restartBtn.setOnClickListener { restartServer() }
-        } catch (e: Exception) {
-            Log.e(tag, "Error setting up buttons", e)
-        }
+        startBtn.setOnClickListener { startServer() }
+        stopBtn.setOnClickListener { stopServer() }
     }
     
     private fun startServer() {
@@ -158,15 +131,14 @@ class MainActivity : AppCompatActivity() {
         
         thread {
             try {
-                // Start WebSocket server (for incoming SMS)
+                // Start WebSocket server first
                 wsServer = WebSocketServer(8765)
                 wsServer?.start()
-                SmsReceiver.globalWebSocketServer = wsServer
                 Log.d(tag, "WebSocket Server started on port 8765")
                 Thread.sleep(500)
                 
-                // Start HTTP server (for sending SMS)
-                httpServer = HttpServer(this@MainActivity, 8080, wsServer, smsCache)
+                // Then HTTP server
+                httpServer = HttpServer(this@MainActivity, 8080, wsServer)
                 httpServer?.start()
                 Log.d(tag, "HTTP Server started on port 8080")
                 
@@ -176,7 +148,7 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     try {
                         updateStatusUI()
-                        statusText.text = "Online - Open http://YOUR_IP:8080"
+                        statusText.text = "Online - http://YOUR_IP:8080"
                     } catch (e: Exception) {
                         Log.e(tag, "Error updating UI", e)
                     }
@@ -187,7 +159,7 @@ class MainActivity : AppCompatActivity() {
                     try {
                         statusText.text = "Error: ${e.message}"
                     } catch (ex: Exception) {
-                        Log.e(tag, "Error updating error UI", ex)
+                        Log.e(tag, "Error updating UI", ex)
                     }
                 }
             }
@@ -199,9 +171,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 httpServer?.stopServer()
                 wsServer?.stopServer()
-                SmsReceiver.globalWebSocketServer = null
                 isServerRunning = false
-                messageCount = 0
                 
                 runOnUiThread {
                     try {
@@ -218,19 +188,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
-    private fun restartServer() {
-        stopServer()
-        thread {
-            Thread.sleep(500)
-            startServer()
-        }
-    }
-    
     private fun updateStatusUI() {
         try {
-            messageCountText.text = messageCount.toString()
+            val status = if (isServerRunning) "Running" else "Stopped"
+            statusText.text = status
         } catch (e: Exception) {
-            Log.e(tag, "Error updating status UI", e)
+            Log.e(tag, "Error updating UI", e)
         }
     }
     
