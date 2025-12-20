@@ -103,15 +103,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
 .chat-area { flex: 1; display: flex; flex-direction: column; }
 .chat-header { background: #f9f9f9; padding: 12px; border-bottom: 1px solid #ddd; font-weight: 500; }
 .messages { flex: 1; overflow-y: auto; padding: 12px; background: white; }
-.msg { margin: 8px 0; padding: 10px 12px; border-radius: 8px; max-width: 85%; }
+.msg { margin: 8px 0; padding: 10px 12px; border-radius: 8px; max-width: 85%; word-wrap: break-word; }
 .msg.in { background: #e3f2fd; color: #1565c0; margin-right: auto; }
 .msg.out { background: #f3e5f5; color: #6a1b9a; margin-left: auto; }
 .msg-time { font-size: 10px; opacity: 0.7; margin-top: 2px; }
 .input-area { padding: 12px; border-top: 1px solid #ddd; display: flex; gap: 8px; }
-textarea { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; resize: none; height: 40px; }
+textarea { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; resize: none; height: 40px; font-family: inherit; }
 button { padding: 10px 16px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; }
 button:hover { background: #5568d3; }
 input.add-phone { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 8px; }
+.loading { font-size: 11px; color: #999; padding: 8px 12px; }
 </style>
 </head>
 <body>
@@ -141,23 +142,94 @@ input.add-phone { width: 100%; padding: 10px; border: 1px solid #ddd; border-rad
 </div>
 </div>
 <script>
-const STATE = { ws: null, connected: false, active: null, chats: {} };
+const STATE = { ws: null, connected: false, active: null, chats: {}, loading: {} };
 const DOM = { dot: document.getElementById('dot'), status: document.getElementById('status'), newPhone: document.getElementById('newPhone'), msg: document.getElementById('msg'), send: document.getElementById('send'), msgs: document.getElementById('msgs'), chatTitle: document.getElementById('chatTitle'), contactsList: document.getElementById('contactsList') };
+
 function connect() {
 const host = localStorage.getItem('anms_host') || location.hostname + ':8765';
 STATE.ws = new WebSocket('ws://' + host);
 STATE.ws.onopen = () => { STATE.connected = true; DOM.dot.classList.remove('offline'); DOM.status.textContent = 'Connected'; if(STATE.active) { DOM.msg.disabled = false; DOM.send.disabled = false; } };
-STATE.ws.onmessage = (e) => { const p = e.data.split('|')[0]; const t = e.data.split('|')[1]; addMsg(p, t, false); };
+STATE.ws.onmessage = (e) => { handleWSMessage(e.data); };
 STATE.ws.onerror = () => { DOM.dot.classList.add('offline'); DOM.status.textContent = 'Error'; };
 STATE.ws.onclose = () => { STATE.connected = false; DOM.dot.classList.add('offline'); DOM.status.textContent = 'Disconnected'; DOM.msg.disabled = true; DOM.send.disabled = true; setTimeout(connect, 3000); };
 }
-function addMsg(phone, text, out) { if(!STATE.chats[phone]) STATE.chats[phone] = []; const time = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); STATE.chats[phone].push({out,text,time}); if(STATE.active === phone) render(); }
-function select(phone) { STATE.active = phone; DOM.msg.disabled = !STATE.connected; DOM.send.disabled = !STATE.connected; DOM.chatTitle.textContent = 'Chat: ' + phone; render(); DOM.msg.focus(); }
-function render() { const c = Object.keys(STATE.chats).sort(); const html = c.map(p => '<div class="contact ' + (STATE.active === p ? 'active' : '') + '" onclick="select(\'' + p + '\')" style="cursor:pointer;"><div class="contact-name">' + p + '</div><div class="contact-preview">' + (STATE.chats[p][STATE.chats[p].length-1]?.text || '') + '</div></div>').join(''); DOM.contactsList.innerHTML = html; if(!STATE.active) DOM.msgs.innerHTML = '<p style="text-align:center;color:#ccc;margin-top:20px;">Select a contact</p>'; else { const m = STATE.chats[STATE.active] || []; DOM.msgs.innerHTML = m.map(x => '<div class="msg ' + (x.out ? 'out' : 'in') + '">' + x.text + '<div class="msg-time">' + x.time + '</div></div>').join(''); DOM.msgs.scrollTop = DOM.msgs.scrollHeight; } }
-function send() { if(!STATE.active || !STATE.connected) return; const t = DOM.msg.value.trim(); if(!t) return; STATE.ws.send(STATE.active + '|' + t); addMsg(STATE.active, t, true); DOM.msg.value = ''; DOM.msg.focus(); }
+
+function handleWSMessage(data) {
+if (data.startsWith('SMS_HISTORY|')) {
+const json = JSON.parse(data.substring(12));
+const phone = json.phone;
+if(!STATE.chats[phone]) STATE.chats[phone] = [];
+STATE.chats[phone] = json.messages.map(m => ({
+out: m.direction === 'sent',
+text: m.body,
+time: m.timestamp.split(' ')[1]
+}));
+if(STATE.active === phone) render();
+STATE.loading[phone] = false;
+} else if (data.startsWith('SMS|')) {
+const parts = data.split('|');
+const phone = parts[1];
+const text = parts[2];
+const dir = parts[3];
+addMsg(phone, text, dir === 'sent');
+} else {
+const p = data.split('|')[0];
+const t = data.split('|')[1];
+if(p && t) addMsg(p, t, false);
+}
+}
+
+function addMsg(phone, text, out) { 
+if(!STATE.chats[phone]) STATE.chats[phone] = []; 
+const time = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); 
+STATE.chats[phone].push({out,text,time}); 
+if(STATE.active === phone) render(); 
+}
+
+function select(phone) { 
+STATE.active = phone; 
+DOM.msg.disabled = !STATE.connected; 
+DOM.send.disabled = !STATE.connected; 
+DOM.chatTitle.textContent = 'Chat: ' + phone; 
+if(!STATE.chats[phone] || STATE.chats[phone].length === 0) {
+if(!STATE.loading[phone]) {
+STATE.loading[phone] = true;
+STATE.ws.send('GET_SMS_HISTORY:' + phone);
+}
+}
+render(); 
+DOM.msg.focus(); 
+}
+
+function render() { 
+const c = Object.keys(STATE.chats).sort(); 
+const html = c.map(p => '<div class="contact ' + (STATE.active === p ? 'active' : '') + '" onclick="select(\'' + p + '\')" style="cursor:pointer;">' + '<div class="contact-name">' + p + '</div>' + '<div class="contact-preview">' + (STATE.chats[p] && STATE.chats[p].length > 0 ? STATE.chats[p][STATE.chats[p].length-1].text : 'No messages') + '</div>' + '</div>').join(''); 
+DOM.contactsList.innerHTML = html; 
+if(!STATE.active) DOM.msgs.innerHTML = '<p style="text-align:center;color:#ccc;margin-top:20px;">Select a contact</p>'; 
+else { 
+if(STATE.loading[STATE.active]) DOM.msgs.innerHTML = '<p class="loading">Loading messages...</p>';
+else {
+const m = STATE.chats[STATE.active] || []; 
+DOM.msgs.innerHTML = m.map(x => '<div class="msg ' + (x.out ? 'out' : 'in') + '">' + x.text + '<div class="msg-time">' + x.time + '</div></div>').join(''); 
+DOM.msgs.scrollTop = DOM.msgs.scrollHeight;
+}
+}
+}
+
+function send() { 
+if(!STATE.active || !STATE.connected) return; 
+const t = DOM.msg.value.trim(); 
+if(!t) return; 
+STATE.ws.send('SEND_SMS|' + STATE.active + '|' + t);
+addMsg(STATE.active, t, true); 
+DOM.msg.value = ''; 
+DOM.msg.focus(); 
+}
+
 DOM.send.onclick = send;
 DOM.msg.onkeypress = (e) => { if(e.key === 'Enter' && e.ctrlKey) send(); };
 DOM.newPhone.onkeypress = (e) => { if(e.key === 'Enter') { const p = DOM.newPhone.value.trim(); if(p && !STATE.chats[p]) { STATE.chats[p] = []; DOM.newPhone.value = ''; select(p); } } };
+
 render();
 connect();
 </script>
