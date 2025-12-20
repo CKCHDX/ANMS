@@ -98,16 +98,11 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             val allConvs = smsDb.getAllConversations(999)
             Log.d(tag, "Total conversations: ${allConvs.size}")
             
-            val debug = mutableMapOf<String, Any>()
-            debug["total_conversations"] = allConvs.size
-            debug["conversations"] = allConvs.mapKeys { it.key }.mapValues { (_, msgs) -> msgs.size }
+            val convList = allConvs.map { (phone, msgs) ->
+                "\"{\\\"phone\\\":\\\"${phone.replace("\\", "\\\\").replace("\"", "\\\"")}\\\",\\\"count\\\":${msgs.size}}\"
+            }.joinToString(",")
             
-            val json = """
-            {
-                "total_conversations": ${allConvs.size},
-                "conversations": ${allConvs.mapValues { it.value.size }}
-            }
-            """.trimIndent()
+            val json = """{"total_conversations":${allConvs.size},"conversations":[$convList]}"""
             
             val contentLength = json.toByteArray().size
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: $contentLength\r\nConnection: close\r\n\r\n$json"
@@ -445,12 +440,12 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             <button onclick="addContact()">Add</button>
         </div>
         <div class="contacts-list" id="contacts"></div>
-        <div class="debug-link" onclick="checkDebug()">Debug Info</div>
+        <div class="debug-link" onclick="checkDebug()">📊 Debug</div>
     </div>
     
     <div class="chat-section">
         <div class="chat-header" id="chatHeader">Select a contact →</div>
-        <div class="messages-container" id="messages"><div class="empty-message">👈 Select a contact to start</div></div>
+        <div class="messages-container" id="messages"><div class="empty-message">👉 Select a contact to start</div></div>
         <div class="input-section">
             <textarea id="msg" placeholder="Type a message..." disabled></textarea>
             <button onclick="send()" id="sendBtn" disabled>Send</button>
@@ -474,7 +469,17 @@ function checkDebug() {
     fetch('http://' + window.location.hostname + ':8080/api/debug')
         .then(r => r.json())
         .then(data => {
-            alert('DEBUG:\n' + JSON.stringify(data, null, 2));
+            let msg = 'DEBUG INFO:\n\n';
+            msg += 'Total Conversations: ' + data.total_conversations + '\n\n';
+            if (data.conversations.length > 0) {
+                msg += 'Conversations:\n';
+                data.conversations.forEach(c => {
+                    msg += '  ' + c.phone + ': ' + c.count + ' messages\n';
+                });
+            } else {
+                msg += 'No SMS found in database!';
+            }
+            alert(msg);
         })
         .catch(e => alert('Error: ' + e));
 }
