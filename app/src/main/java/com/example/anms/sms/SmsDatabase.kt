@@ -16,116 +16,64 @@ class SmsDatabase(private val context: Context) {
         val type: Int // 1=received, 2=sent
     )
     
-    fun getLastNDays(days: Int = 7): List<SmsMessage> {
-        Log.d(tag, "=== Getting SMS from last $days days ===")
-        return try {
-            val messages = mutableListOf<SmsMessage>()
-            val nDaysAgo = System.currentTimeMillis() - (days.toLong() * 24 * 60 * 60 * 1000)
-            
-            val smsUri = Uri.parse("content://sms")
-            val projection = arrayOf("_id", "address", "body", "date", "type")
-            val selection = "date > ?"
-            val selectionArgs = arrayOf((nDaysAgo).toString())
-            
-            Log.d(tag, "Querying SMS from last $days days (since ${nDaysAgo}ms ago)")
-            
-            val cursor: Cursor? = context.contentResolver.query(
-                smsUri,
-                projection,
-                selection,
-                selectionArgs,
-                "date DESC"
-            )
-            
-            Log.d(tag, "Total SMS found: ${cursor?.count}")
-            
-            cursor?.use {
-                val idCol = it.getColumnIndex("_id")
-                val addressCol = it.getColumnIndex("address")
-                val bodyCol = it.getColumnIndex("body")
-                val dateCol = it.getColumnIndex("date")
-                val typeCol = it.getColumnIndex("type")
-                
-                while (it.moveToNext()) {
-                    try {
-                        val id = it.getString(idCol)
-                        val address = it.getString(addressCol) ?: "Unknown"
-                        val body = it.getString(bodyCol) ?: ""
-                        val timestamp = it.getLong(dateCol)
-                        val type = it.getInt(typeCol)
-                        
-                        // Skip messages with empty body or too long (likely images/mms)
-                        if (body.isNotEmpty() && body.length < 5000) {
-                            messages.add(SmsMessage(
-                                id = id,
-                                phone = address,
-                                body = body,
-                                timestamp = timestamp,
-                                type = type
-                            ))
-                        }
-                    } catch (e: Exception) {
-                        Log.e(tag, "Error parsing SMS row: ${e.message}")
-                    }
-                }
-            }
-            
-            // Sort by timestamp ascending (oldest first)
-            messages.sortBy { it.timestamp }
-            
-            Log.d(tag, "Returning ${messages.size} valid messages")
-            messages
-        } catch (e: Exception) {
-            Log.e(tag, "Error reading SMS: ${e.message}", e)
-            e.printStackTrace()
-            emptyList()
-        }
-    }
-    
     fun getConversation(phoneNumber: String, limit: Int = 500): List<SmsMessage> {
         Log.d(tag, "=== Getting conversation for: $phoneNumber ===")
         return try {
             val messages = mutableListOf<SmsMessage>()
             
-            // Try to query SMS content provider
             val smsUri = Uri.parse("content://sms")
             val projection = arrayOf("_id", "address", "body", "date", "type")
             
-            // Query ALL SMS first
+            Log.d(tag, "Querying URI: $smsUri")
+            Log.d(tag, "Requesting projection: ${projection.joinToString(", ")}")
+            
             val cursor: Cursor? = context.contentResolver.query(
                 smsUri,
                 projection,
                 null,
                 null,
-                "date DESC"
+                "date DESC LIMIT $limit"
             )
             
-            Log.d(tag, "Total SMS in database: ${cursor?.count}")
+            if (cursor == null) {
+                Log.e(tag, "Cursor is NULL - permission denied or provider unavailable")
+                return emptyList()
+            }
             
-            cursor?.use {
+            Log.d(tag, "Cursor returned: ${cursor.count} total SMS in database")
+            
+            cursor.use {
                 val idCol = it.getColumnIndex("_id")
                 val addressCol = it.getColumnIndex("address")
                 val bodyCol = it.getColumnIndex("body")
                 val dateCol = it.getColumnIndex("date")
                 val typeCol = it.getColumnIndex("type")
                 
-                Log.d(tag, "Columns - id:$idCol addr:$addressCol body:$bodyCol date:$dateCol type:$typeCol")
+                Log.d(tag, "Column indices - id:$idCol addr:$addressCol body:$bodyCol date:$dateCol type:$typeCol")
+                
+                if (idCol < 0 || addressCol < 0 || bodyCol < 0 || dateCol < 0 || typeCol < 0) {
+                    Log.e(tag, "Invalid column index - columns not found")
+                    return emptyList()
+                }
                 
                 val cleanPhoneTarget = phoneNumber.replace("[^0-9+]".toRegex(), "")
                 val lastDigits = cleanPhoneTarget.replace("+", "").takeLast(11)
                 
-                Log.d(tag, "Looking for phone: $phoneNumber (clean: $cleanPhoneTarget, last11: $lastDigits)")
+                Log.d(tag, "Looking for phone: $phoneNumber")
+                Log.d(tag, "  Clean: $cleanPhoneTarget")
+                Log.d(tag, "  Last 11 digits: $lastDigits")
                 
                 var matchCount = 0
+                var totalCount = 0
                 while (it.moveToNext()) {
                     try {
+                        totalCount++
                         val id = it.getString(idCol)
                         val address = it.getString(addressCol) ?: "Unknown"
                         val body = it.getString(bodyCol) ?: ""
                         val timestamp = it.getLong(dateCol)
                         val type = it.getInt(typeCol)
                         
-                        // Check if this SMS matches our target phone
                         if (addressMatches(address, cleanPhoneTarget, lastDigits)) {
                             messages.add(SmsMessage(
                                 id = id,
@@ -135,24 +83,23 @@ class SmsDatabase(private val context: Context) {
                                 type = type
                             ))
                             matchCount++
-                            Log.d(tag, "Match #$matchCount: $address -> $body")
+                            if (matchCount <= 3) {
+                                Log.d(tag, "Match #$matchCount: $address | ${body.take(50)}...")
+                            }
                         }
                     } catch (e: Exception) {
-                        Log.e(tag, "Error parsing SMS row: ${e.message}", e)
+                        Log.e(tag, "Error parsing row $totalCount: ${e.message}")
                     }
                 }
                 
-                Log.d(tag, "Found $matchCount matching messages")
+                Log.d(tag, "Scanned $totalCount rows, found $matchCount matches")
             }
             
-            // Sort by timestamp ascending (oldest first)
             messages.sortBy { it.timestamp }
-            
-            Log.d(tag, "Returning ${messages.size} messages")
+            Log.d(tag, "Returning ${messages.size} messages sorted by timestamp")
             messages
         } catch (e: Exception) {
-            Log.e(tag, "Error reading SMS: ${e.message}", e)
-            e.printStackTrace()
+            Log.e(tag, "Exception in getConversation: ${e.message}", e)
             emptyList()
         }
     }
@@ -167,9 +114,6 @@ class SmsDatabase(private val context: Context) {
                    address.contains(cleanPhone) ||
                    address == cleanPhone
         
-        if (match) {
-            Log.d(tag, "  MATCH: '$address' matches '$cleanPhone'")
-        }
         return match
     }
     
@@ -188,7 +132,12 @@ class SmsDatabase(private val context: Context) {
                 "date DESC"
             )
             
-            cursor?.use {
+            if (cursor == null) {
+                Log.e(tag, "Cursor is NULL in getAllConversations")
+                return emptyMap()
+            }
+            
+            cursor.use {
                 val idCol = it.getColumnIndex("_id")
                 val addressCol = it.getColumnIndex("address")
                 val bodyCol = it.getColumnIndex("body")
@@ -213,9 +162,7 @@ class SmsDatabase(private val context: Context) {
                 }
             }
             
-            // Sort messages within each conversation
             conversations.forEach { (_, msgs) -> msgs.sortBy { it.timestamp } }
-            
             Log.d(tag, "Loaded ${conversations.size} conversations")
             conversations
         } catch (e: Exception) {
