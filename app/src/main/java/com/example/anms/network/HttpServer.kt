@@ -2,78 +2,34 @@ package com.example.anms.network
 
 import android.content.Context
 import android.util.Log
-import com.sun.net.httpserver.HttpServer
-import com.sun.net.httpserver.HttpExchange
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.net.InetSocketAddress
+import fi.iki.elonen.NanoHTTPD
 import kotlin.concurrent.thread
 
-class HttpServer(context: Context, private val port: Int = 8080) {
-    private var server: HttpServer? = null
+class HttpServer(context: Context, port: Int = 8080) : NanoHTTPD(port) {
     private val tag = "ANMS_Http"
 
-    fun start() {
-        thread {
-            try {
-                server = HttpServer.create(InetSocketAddress(port), 0).apply {
-                    createContext("/") { exchange ->
-                        handleRequest(exchange)
-                    }
-                    executor = null
-                    start()
-                }
-                Log.d(tag, "HTTP Server started on port $port")
-            } catch (e: Exception) {
-                Log.e(tag, "Error starting HTTP server", e)
-            }
-        }
+    init {
+        start()
+        Log.d(tag, "HTTP Server started on port $port")
     }
 
-    private fun handleRequest(exchange: HttpExchange) {
-        try {
-            val path = exchange.requestURI.path
-            Log.d(tag, "HTTP Request: $path")
-
-            when {
-                path == "/" || path == "/index.html" -> {
-                    sendHtmlResponse(exchange, getIndexHtml())
-                }
-                path == "/" -> {
-                    sendHtmlResponse(exchange, getIndexHtml())
+    override fun serve(session: IHTTPSession?): Response {
+        return try {
+            when (session?.uri) {
+                "/", "/index.html" -> {
+                    val html = getIndexHtml()
+                    newFixedLengthResponse(html).apply {
+                        addHeader("Content-Type", "text/html; charset=utf-8")
+                    }
                 }
                 else -> {
-                    send404(exchange)
+                    newFixedLengthResponse(Response.Status.NOT_FOUND, "text/html", "<html><body><h1>404 Not Found</h1></body></html>")
                 }
             }
         } catch (e: Exception) {
             Log.e(tag, "Error handling request", e)
-            send500(exchange)
+            newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/html", "<html><body><h1>500 Server Error</h1></body></html>")
         }
-    }
-
-    private fun sendHtmlResponse(exchange: HttpExchange, html: String) {
-        exchange.responseHeaders.set("Content-Type", "text/html; charset=utf-8")
-        exchange.responseHeaders.set("Access-Control-Allow-Origin", "*")
-        exchange.sendResponseHeaders(200, html.toByteArray().size.toLong())
-        exchange.responseBody.write(html.toByteArray())
-        exchange.responseBody.close()
-    }
-
-    private fun send404(exchange: HttpExchange) {
-        val response = "<html><body><h1>404 Not Found</h1></body></html>"
-        exchange.responseHeaders.set("Content-Type", "text/html")
-        exchange.sendResponseHeaders(404, response.toByteArray().size.toLong())
-        exchange.responseBody.write(response.toByteArray())
-        exchange.responseBody.close()
-    }
-
-    private fun send500(exchange: HttpExchange) {
-        val response = "<html><body><h1>500 Internal Server Error</h1></body></html>"
-        exchange.responseHeaders.set("Content-Type", "text/html")
-        exchange.sendResponseHeaders(500, response.toByteArray().size.toLong())
-        exchange.responseBody.write(response.toByteArray())
-        exchange.responseBody.close()
     }
 
     private fun getIndexHtml(): String {
@@ -84,157 +40,33 @@ class HttpServer(context: Context, private val port: Int = 8080) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ANMS Client</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: Arial, sans-serif;
-            background: #667eea;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 10px;
-        }
-        .container {
-            width: 100%;
-            max-width: 500px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-            display: flex;
-            flex-direction: column;
-            height: 90vh;
-            max-height: 800px;
-        }
-        .header {
-            background: #667eea;
-            color: white;
-            padding: 15px;
-            border-radius: 8px 8px 0 0;
-            text-align: center;
-        }
-        .header h1 {
-            font-size: 20px;
-            margin-bottom: 5px;
-        }
-        .status {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 10px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
-            font-size: 11px;
-        }
-        .dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #4caf50;
-        }
-        .dot.offline {
-            background: #f44336;
-        }
-        .messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 15px;
-            background: #f5f5f5;
-        }
-        .msg {
-            margin-bottom: 10px;
-            padding: 10px;
-            border-radius: 6px;
-            word-break: break-word;
-        }
-        .msg.in {
-            background: #e3f2fd;
-            color: #1565c0;
-        }
-        .msg.out {
-            background: #f3e5f5;
-            color: #6a1b9a;
-            margin-left: 15px;
-        }
-        .meta {
-            font-size: 10px;
-            opacity: 0.7;
-            margin-top: 3px;
-        }
-        .input-area {
-            padding: 12px;
-            background: white;
-            border-top: 1px solid #ddd;
-        }
-        input[type="text"],
-        textarea {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-            font-family: Arial, sans-serif;
-            margin-bottom: 8px;
-            resize: none;
-        }
-        textarea {
-            height: 70px;
-        }
-        input[type="text"]:focus,
-        textarea:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
-        }
-        .buttons {
-            display: flex;
-            gap: 8px;
-        }
-        button {
-            flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 4px;
-            font-size: 13px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .btn-send {
-            background: #667eea;
-            color: white;
-        }
-        .btn-send:hover:not(:disabled) {
-            background: #5568d3;
-        }
-        .btn-send:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        .btn-clear {
-            background: #f44336;
-            color: white;
-        }
-        .btn-clear:hover {
-            background: #d32f2f;
-        }
-        .notif {
-            padding: 8px;
-            border-radius: 4px;
-            margin-bottom: 8px;
-            font-size: 12px;
-        }
-        .notif.success {
-            background: #f1f8e9;
-            color: #2e7d32;
-        }
-        .notif.error {
-            background: #ffebee;
-            color: #c62828;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #667eea; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 10px; }
+        .container { width: 100%; max-width: 500px; background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); display: flex; flex-direction: column; height: 90vh; max-height: 800px; }
+        .header { background: #667eea; color: white; padding: 15px; border-radius: 8px 8px 0 0; text-align: center; }
+        .header h1 { font-size: 20px; margin-bottom: 5px; }
+        .status { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; background: rgba(255, 255, 255, 0.2); border-radius: 12px; font-size: 11px; }
+        .dot { width: 6px; height: 6px; border-radius: 50%; background: #4caf50; }
+        .dot.offline { background: #f44336; }
+        .messages { flex: 1; overflow-y: auto; padding: 15px; background: #f5f5f5; }
+        .msg { margin-bottom: 10px; padding: 10px; border-radius: 6px; word-break: break-word; }
+        .msg.in { background: #e3f2fd; color: #1565c0; }
+        .msg.out { background: #f3e5f5; color: #6a1b9a; margin-left: 15px; }
+        .meta { font-size: 10px; opacity: 0.7; margin-top: 3px; }
+        .input-area { padding: 12px; background: white; border-top: 1px solid #ddd; }
+        input, textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; font-family: Arial, sans-serif; margin-bottom: 8px; resize: none; }
+        textarea { height: 70px; }
+        input:focus, textarea:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1); }
+        .buttons { display: flex; gap: 8px; }
+        button { flex: 1; padding: 10px; border: none; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+        .btn-send { background: #667eea; color: white; }
+        .btn-send:hover:not(:disabled) { background: #5568d3; }
+        .btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-clear { background: #f44336; color: white; }
+        .btn-clear:hover { background: #d32f2f; }
+        .notif { padding: 8px; border-radius: 4px; margin-bottom: 8px; font-size: 12px; }
+        .notif.success { background: #f1f8e9; color: #2e7d32; }
+        .notif.error { background: #ffebee; color: #c62828; }
     </style>
 </head>
 <body>
@@ -276,10 +108,6 @@ class HttpServer(context: Context, private val port: Int = 8080) {
             return host;
         }
 
-        function saveHost(host) {
-            localStorage.setItem('anms_host', host);
-        }
-
         function connect() {
             let host = getHost();
             try {
@@ -290,7 +118,7 @@ class HttpServer(context: Context, private val port: Int = 8080) {
                     DOT.classList.remove('offline');
                     STATUS.textContent = 'Connected';
                     SEND.disabled = false;
-                    show('Connected to host', 'success');
+                    show('Connected', 'success');
                 };
 
                 ws.onmessage = (e) => {
@@ -367,13 +195,13 @@ class HttpServer(context: Context, private val port: Int = 8080) {
 """
     }
 
-    fun stop() {
+    fun stopServer() {
         thread {
             try {
-                server?.stop(0)
+                stop()
                 Log.d(tag, "HTTP server stopped")
             } catch (e: Exception) {
-                Log.e(tag, "Error stopping HTTP server", e)
+                Log.e(tag, "Error stopping server", e)
             }
         }
     }
