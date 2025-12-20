@@ -567,7 +567,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
         
         /* ==================== KEITAI / MOBILE (<480px) ==================== */
         @media (max-width: 480px) {
-            html, body { font-size: 13px; }
+            html, body { font-size: 14px; }
             .main { flex-direction: column; width: 100vw; height: 100vh; }
             
             .sidebar {
@@ -581,7 +581,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             
             .sidebar.chat-active { display: none; }
             
-            .sidebar-header { font-size: 12px; padding: 2px 0; }
+            .sidebar-header { font-size: 13px; padding: 2px 0; }
             
             /* FULL WIDTH INPUT - CRITICAL FOR KEITAI */
             .phone-input-group {
@@ -630,7 +630,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             
             .chat-container.chat-active { display: flex; }
             
-            .chat-header { padding: 8px; font-size: 12px; gap: 6px; }
+            .chat-header { padding: 8px; font-size: 13px; gap: 6px; }
             
             .chat-header-back {
                 display: block !important;
@@ -641,20 +641,20 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 align-items: center;
             }
             
-            .chat-header-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+            .chat-header-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
             
-            .messages-area { padding: 6px; gap: 3px; font-size: 12px; flex: 1; }
+            .messages-area { padding: 8px; gap: 5px; font-size: 13px; flex: 1; }
             
             .message-group { max-width: 90%; }
-            .message-bubble { max-width: 100%; padding: 6px 8px; font-size: 12px; border-radius: 5px; line-height: 1.3; }
-            .message-time { font-size: 10px; }
+            .message-bubble { max-width: 100%; padding: 8px 10px; font-size: 14px; border-radius: 5px; line-height: 1.4; }
+            .message-time { font-size: 11px; }
             
             .input-section { padding: 6px; gap: 4px; flex-direction: column; }
-            .input-section textarea { padding: 6px; font-size: 12px; min-height: 28px; width: 100%; }
-            .input-section button { padding: 6px 10px; font-size: 11px; width: 100%; min-height: 44px; }
+            .input-section textarea { padding: 8px; font-size: 13px; min-height: 32px; width: 100%; }
+            .input-section button { padding: 8px 12px; font-size: 12px; width: 100%; min-height: 44px; }
             
-            .status-bar { padding: 4px 6px; font-size: 10px; }
-            .empty-state { font-size: 12px; }
+            .status-bar { padding: 4px 6px; font-size: 11px; }
+            .empty-state { font-size: 13px; }
         }
     </style>
 </head>
