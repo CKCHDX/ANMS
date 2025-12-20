@@ -422,6 +422,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             padding: 12px 16px;
             border-radius: 12px;
             word-wrap: break-word;
+            overflow-wrap: break-word;
             font-size: 16px;
             line-height: 1.4;
         }
@@ -644,8 +645,8 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             
             .messages-area { padding: 6px; gap: 3px; font-size: 12px; flex: 1; }
             
-            .message-group { max-width: 85%; }
-            .message-bubble { padding: 6px 8px; font-size: 12px; border-radius: 5px; line-height: 1.2; }
+            .message-group { max-width: 90%; }
+            .message-bubble { max-width: 100%; padding: 6px 8px; font-size: 12px; border-radius: 5px; line-height: 1.3; }
             .message-time { font-size: 10px; }
             
             .input-section { padding: 6px; gap: 4px; flex-direction: column; }
