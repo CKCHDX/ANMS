@@ -162,347 +162,338 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
-    <title>ANMS - SMS Chat</title>
+    <title>SMS Chat</title>
     <style>
-        :root {
-            --primary: #3b82f6;
-            --primary-dark: #1e40af;
-            --secondary: #10b981;
-            --bg: #f8fafc;
-            --surface: #ffffff;
-            --border: #e2e8f0;
-            --text: #1e293b;
-            --text-light: #64748b;
-        }
-        
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { height: 100%; }
+        html, body { height: 100%; width: 100%; }
         body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .container {
-            display: flex;
-            height: 100vh;
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #fff;
+            color: #000;
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 0;
             overflow: hidden;
         }
         
         .sidebar {
-            width: 100%;
-            max-width: 280px;
-            background: var(--surface);
-            border-right: 1px solid var(--border);
+            background: #f5f5f5;
+            border-right: 2px solid #ddd;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
+            min-height: 100vh;
         }
         
-        .sidebar-header {
+        .sidebar-title {
             padding: 16px;
-            border-bottom: 1px solid var(--border);
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            font-size: 18px;
+            font-weight: bold;
+            background: #2c3e50;
             color: white;
-            font-weight: 600;
-            font-size: 16px;
+            border-bottom: 2px solid #1a252f;
         }
         
-        .add-contact {
+        .add-contact-box {
             padding: 12px;
             display: flex;
             gap: 8px;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid #ddd;
+            background: white;
         }
         
-        .add-contact input {
+        .add-contact-box input {
             flex: 1;
-            padding: 8px 12px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
+            padding: 10px;
+            border: 2px solid #ccc;
+            border-radius: 4px;
             font-size: 14px;
-            font-family: inherit;
+            font-family: monospace;
         }
         
-        .add-contact input:focus {
+        .add-contact-box input:focus {
             outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            border-color: #2196F3;
+            box-shadow: 0 0 4px #2196F3;
         }
         
-        .add-contact button {
-            padding: 8px 16px;
-            background: var(--primary);
+        .add-contact-box button {
+            padding: 10px 16px;
+            background: #2196F3;
             color: white;
             border: none;
-            border-radius: 6px;
-            font-weight: 600;
+            border-radius: 4px;
+            font-weight: bold;
             cursor: pointer;
-            transition: background 0.2s;
+            font-size: 14px;
         }
         
-        .add-contact button:hover {
-            background: var(--primary-dark);
+        .add-contact-box button:hover {
+            background: #0b7dda;
         }
         
-        .add-contact button:active {
-            transform: scale(0.98);
+        .add-contact-box button:active {
+            background: #0056b3;
         }
         
-        .contacts {
+        .contacts-list {
             flex: 1;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
         }
         
-        .contact {
+        .contact-item {
             padding: 12px 16px;
+            border-bottom: 1px solid #ddd;
             cursor: pointer;
-            border-bottom: 1px solid var(--border);
-            transition: background 0.2s;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            transition: background 0.15s;
+            background: white;
         }
         
-        .contact:hover {
-            background: #f1f5f9;
+        .contact-item:hover {
+            background: #e8e8e8;
         }
         
-        .contact.active {
-            background: var(--primary);
+        .contact-item.active {
+            background: #2196F3;
             color: white;
-        }
-        
-        .contact-info {
-            flex: 1;
-            min-width: 0;
+            font-weight: bold;
+            border-left: 4px solid #1976d2;
         }
         
         .contact-phone {
+            font-size: 16px;
             font-weight: 500;
-            font-size: 14px;
         }
         
-        .contact-badge {
+        .contact-count {
             font-size: 12px;
             opacity: 0.7;
+            margin-top: 4px;
         }
         
-        .chat-area {
-            flex: 1;
+        .chat-container {
             display: flex;
             flex-direction: column;
-            overflow: hidden;
-            background: var(--bg);
+            min-height: 100vh;
+            background: white;
         }
         
         .chat-header {
             padding: 16px;
-            background: var(--surface);
-            border-bottom: 1px solid var(--border);
-            font-weight: 600;
+            background: #2c3e50;
+            color: white;
             font-size: 16px;
+            font-weight: bold;
+            border-bottom: 2px solid #1a252f;
         }
         
-        .messages {
+        .messages-area {
             flex: 1;
             overflow-y: auto;
             padding: 16px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 8px;
+            background: #fafafa;
         }
         
         .message {
             display: flex;
-            gap: 8px;
-            animation: slideIn 0.3s ease-out;
+            margin-bottom: 8px;
+            animation: fadeIn 0.3s ease-in;
         }
         
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
         
-        .message.in {
+        .msg-in {
             justify-content: flex-start;
         }
         
-        .message.out {
+        .msg-out {
             justify-content: flex-end;
         }
         
-        .message-bubble {
+        .bubble {
             max-width: 70%;
             padding: 10px 14px;
-            border-radius: 12px;
+            border-radius: 8px;
             word-wrap: break-word;
-            font-size: 14px;
+            font-size: 15px;
             line-height: 1.4;
         }
         
-        .message.in .message-bubble {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            color: var(--text);
+        .msg-in .bubble {
+            background: white;
+            border: 1px solid #ccc;
+            color: #000;
         }
         
-        .message.out .message-bubble {
-            background: var(--primary);
+        .msg-out .bubble {
+            background: #2196F3;
             color: white;
         }
         
-        .message-time {
-            font-size: 12px;
-            color: var(--text-light);
+        .msg-time {
+            font-size: 11px;
+            color: #999;
+            margin-top: 4px;
             padding: 0 4px;
-            align-self: flex-end;
         }
         
-        .empty-state {
+        .msg-in .msg-time {
+            text-align: left;
+        }
+        
+        .msg-out .msg-time {
+            text-align: right;
+        }
+        
+        .empty-chat {
             display: flex;
             align-items: center;
             justify-content: center;
             height: 100%;
-            color: var(--text-light);
+            color: #999;
+            font-size: 16px;
             text-align: center;
             padding: 20px;
         }
         
-        .input-area {
+        .input-section {
             padding: 12px;
-            background: var(--surface);
-            border-top: 1px solid var(--border);
+            background: white;
+            border-top: 2px solid #ddd;
             display: flex;
             gap: 8px;
         }
         
-        .input-area textarea {
+        .input-section textarea {
             flex: 1;
-            padding: 10px 12px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-family: inherit;
+            padding: 10px;
+            border: 2px solid #ccc;
+            border-radius: 4px;
+            font-family: system-ui, sans-serif;
             font-size: 14px;
             resize: none;
-            max-height: 100px;
+            max-height: 80px;
         }
         
-        .input-area textarea:focus {
+        .input-section textarea:focus {
             outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            border-color: #2196F3;
+            box-shadow: 0 0 4px #2196F3;
         }
         
-        .input-area button {
+        .input-section button {
             padding: 10px 20px;
-            background: var(--primary);
+            background: #2196F3;
             color: white;
             border: none;
-            border-radius: 6px;
-            font-weight: 600;
+            border-radius: 4px;
+            font-weight: bold;
             cursor: pointer;
-            transition: background 0.2s;
+            font-size: 14px;
             white-space: nowrap;
         }
         
-        .input-area button:hover {
-            background: var(--primary-dark);
+        .input-section button:hover {
+            background: #0b7dda;
         }
         
-        .input-area button:disabled {
+        .input-section button:active {
+            background: #0056b3;
+        }
+        
+        .input-section button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
         
-        .status {
+        .status-bar {
             padding: 8px 16px;
+            background: #f0f0f0;
+            border-top: 1px solid #ddd;
             font-size: 12px;
-            color: var(--text-light);
-            text-align: center;
-            background: #f1f5f9;
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .status-bar.active {
+            color: #4CAF50;
+        }
+        
+        .status-bar.loading {
+            color: #FF9800;
+        }
+        
+        .status-bar.error {
+            color: #f44336;
+        }
+        
+        @media (max-width: 900px) {
+            body { grid-template-columns: 1fr; }
+            .sidebar { display: none; }
         }
         
         @media (max-width: 600px) {
-            .container {
-                flex-direction: column;
-            }
-            
-            .sidebar {
-                max-width: 100%;
-                width: 100%;
-                max-height: 40%;
-                border-right: none;
-                border-bottom: 1px solid var(--border);
-            }
-            
-            .chat-area {
-                flex: 1;
-            }
-            
-            .message-bubble {
-                max-width: 85%;
-            }
+            body { grid-template-columns: 1fr; }
+            .sidebar { max-height: 35vh; border-right: none; border-bottom: 2px solid #ddd; }
+            .chat-container { min-height: 65vh; }
+            .bubble { max-width: 85%; }
         }
         
-        @media (max-width: 480px) {
-            .sidebar {
-                max-height: 35%;
-            }
-            
-            .sidebar-header,
-            .add-contact,
-            .chat-header {
-                padding: 12px;
-            }
-            
-            .messages {
-                padding: 12px;
-            }
+        @media (max-width: 400px) {
+            .sidebar { max-height: 30vh; }
+            .chat-container { min-height: 70vh; }
+            .add-contact-box { flex-wrap: wrap; }
+            .add-contact-box button { width: 100%; }
         }
     </style>
 </head>
 <body>
-<div class="container">
     <div class="sidebar">
-        <div class="sidebar-header">💬 Messages</div>
-        <div class="add-contact">
+        <div class="sidebar-title">💬 Contacts</div>
+        <div class="add-contact-box">
             <input type="tel" id="phone" placeholder="+1234567890" maxlength="20">
             <button onclick="addContact()">Add</button>
         </div>
-        <div class="contacts" id="contacts"></div>
+        <div class="contacts-list" id="contacts"></div>
     </div>
     
-    <div class="chat-area">
-        <div class="chat-header" id="chatHeader">Select a contact</div>
-        <div class="messages" id="messages"><div class="empty-state">👈 Select a contact to start</div></div>
-        <div class="input-area">
-            <textarea id="msg" placeholder="Type a message..." disabled></textarea>
+    <div class="chat-container">
+        <div class="chat-header" id="chatHeader">Select a contact →</div>
+        <div class="messages-area" id="messages"><div class="empty-chat">👈 Select a contact to start chatting</div></div>
+        <div class="input-section">
+            <textarea id="msg" placeholder="Type message..." disabled></textarea>
             <button onclick="send()" id="sendBtn" disabled>Send</button>
         </div>
-        <div class="status" id="status">Ready</div>
+        <div class="status-bar active" id="status">✓ Ready</div>
     </div>
-</div>
+</body>
 
 <script>
 let active, chats = {}, contacts = [], pollInterval;
 
 function init() {
-    contacts = JSON.parse(localStorage.getItem('anms_contacts') || '[]');
-    chats = JSON.parse(localStorage.getItem('anms_chats') || '{}');
+    const saved = localStorage.getItem('anms_contacts');
+    const savedChats = localStorage.getItem('anms_chats');
+    contacts = saved ? JSON.parse(saved) : [];
+    chats = savedChats ? JSON.parse(savedChats) : {};
     renderContacts();
 }
 
 function addContact() {
-    const p = document.getElementById('phone').value.trim();
-    if (!p || contacts.includes(p)) return;
+    const inp = document.getElementById('phone');
+    const p = inp.value.trim();
+    if (!p) { alert('Enter a phone number'); return; }
+    if (contacts.includes(p)) { alert('Already added'); return; }
     contacts.push(p);
     localStorage.setItem('anms_contacts', JSON.stringify(contacts));
-    document.getElementById('phone').value = '';
+    inp.value = '';
     renderContacts();
     selectContact(p);
 }
@@ -512,10 +503,12 @@ function selectContact(p) {
     renderContacts();
     document.getElementById('msg').disabled = false;
     document.getElementById('sendBtn').disabled = false;
-    document.getElementById('chatHeader').textContent = p;
+    document.getElementById('chatHeader').textContent = '📱 ' + p;
     clearInterval(pollInterval);
+    updateStatus('Loading...', 'loading');
     loadChat(p).then(() => {
         renderMsgs();
+        updateStatus('✓ Ready', 'active');
         startPolling();
     });
 }
@@ -529,73 +522,86 @@ function loadChat(phone) {
             return data;
         })
         .catch(e => {
-            updateStatus('Error loading');
-            console.error('Load error:', e);
+            updateStatus('✗ Load error', 'error');
+            console.error(e);
         });
 }
 
 function startPolling() {
     if (!active) return;
     pollInterval = setInterval(() => {
-        if (active) loadChat(active).then(() => renderMsgs());
+        if (active) {
+            loadChat(active).then(() => {
+                renderMsgs();
+            }).catch(() => {});
+        }
     }, 2000);
 }
 
 function send() {
     if (!active) return;
-    const text = document.getElementById('msg').value.trim();
-    if (!text) return;
+    const txt = document.getElementById('msg').value.trim();
+    if (!txt) return;
     
     document.getElementById('sendBtn').disabled = true;
     document.getElementById('msg').value = '';
-    updateStatus('Sending...');
+    updateStatus('⏳ Sending...', 'loading');
     
     fetch('http://' + window.location.hostname + ':8080/send', {
         method: 'POST',
-        body: 'phone=' + encodeURIComponent(active) + '&message=' + encodeURIComponent(text)
+        body: 'phone=' + encodeURIComponent(active) + '&message=' + encodeURIComponent(txt)
     })
     .then(r => r.json())
     .then(data => {
-        if (data.success) {
-            setTimeout(() => loadChat(active).then(() => renderMsgs()), 500);
-            updateStatus('Ready');
-        } else {
-            updateStatus('Send failed');
-        }
         document.getElementById('sendBtn').disabled = false;
+        if (data.success) {
+            updateStatus('✓ Sent', 'active');
+            setTimeout(() => loadChat(active).then(() => renderMsgs()), 500);
+        } else {
+            updateStatus('✗ Failed', 'error');
+        }
     })
     .catch(e => {
-        updateStatus('Error');
         document.getElementById('sendBtn').disabled = false;
+        updateStatus('✗ Error', 'error');
+        console.error(e);
     });
 }
 
 function renderContacts() {
-    const html = contacts.map(p => {
+    const html = contacts.length > 0 ? contacts.map(p => {
         const cnt = (chats[p] || []).length;
-        return '<div class="contact ' + (active === p ? 'active' : '') + '" onclick="selectContact(\'' + p.replace(/'/g, "\\'") + '\')"><div class="contact-info"><div class="contact-phone">' + p + '</div><div class="contact-badge">' + cnt + ' messages</div></div></div>';
-    }).join('');
-    document.getElementById('contacts').innerHTML = html || '<div style="padding: 20px; text-align: center; color: #999; font-size: 14px;">No contacts yet</div>';
+        const cls = active === p ? 'active' : '';
+        return '<div class="contact-item ' + cls + '" onclick="selectContact(\'' + p.replace(/'/g, "\\") + '\')" style="cursor:pointer"><div class="contact-phone">' + escapeHtml(p) + '</div><div class="contact-count">' + cnt + ' msgs</div></div>';
+    }).join('') : '<div style="padding:20px;color:#999;text-align:center">No contacts</div>';
+    document.getElementById('contacts').innerHTML = html;
 }
 
 function renderMsgs() {
     const msgs = chats[active] || [];
+    if (msgs.length === 0) {
+        document.getElementById('messages').innerHTML = '<div class="empty-chat">📭 No messages</div>';
+        return;
+    }
     const html = msgs.map(m => {
-        return '<div class="message ' + m.dir + '"><div class="message-bubble">' + escapeHtml(m.body) + '</div><div class="message-time">' + m.time + '</div></div>';
+        const dirClass = m.dir === 'in' ? 'msg-in' : 'msg-out';
+        return '<div class="message ' + dirClass + '"><div><div class="bubble">' + escapeHtml(m.body) + '</div><div class="msg-time">' + escapeHtml(m.time) + '</div></div></div>';
     }).join('');
-    const c = document.getElementById('messages');
-    c.innerHTML = html || '<div class="empty-state">No messages yet</div>';
-    c.scrollTop = c.scrollHeight;
+    const area = document.getElementById('messages');
+    area.innerHTML = html;
+    area.scrollTop = area.scrollHeight;
 }
 
-function updateStatus(s) {
-    document.getElementById('status').textContent = s;
+function updateStatus(txt, cls) {
+    const el = document.getElementById('status');
+    el.textContent = txt;
+    el.className = 'status-bar ' + (cls || '');
 }
 
 function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
 }
 
 document.getElementById('msg').addEventListener('keypress', e => {
