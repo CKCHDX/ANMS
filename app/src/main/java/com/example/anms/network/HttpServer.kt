@@ -612,6 +612,10 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 border: none;
                 padding: 8px;
                 gap: 8px;
+                flex: 0 1 auto;
+                display: flex;
+                flex-direction: column;
+                max-height: none;
             }
             
             /* Hide sidebar when chat is active on small screens */
@@ -623,6 +627,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 font-size: 14px;
                 font-weight: 600;
                 padding: 4px 0;
+                flex-shrink: 0;
             }
             
             .phone-input-group {
@@ -630,6 +635,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 grid-template-columns: 1fr 1fr;
                 gap: 6px;
                 width: 100%;
+                flex-shrink: 0;
             }
             
             .phone-input-group input {
@@ -647,10 +653,11 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             }
             
             .contacts-list {
-                flex: none;
-                max-height: 100%;
+                flex: 1 1 auto;
+                max-height: none;
+                min-height: 120px;
                 gap: 4px;
-                padding-bottom: 0;
+                padding-bottom: 8px;
                 overflow-y: auto;
             }
             
@@ -661,6 +668,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 border: 1px solid #333;
                 cursor: pointer;
                 transition: all 0.2s;
+                flex-shrink: 0;
             }
             
             .contact-item:active {
@@ -696,6 +704,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 font-size: 13px;
                 font-weight: 600;
                 gap: 8px;
+                flex-shrink: 0;
             }
             
             .chat-header-back {
@@ -730,6 +739,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 gap: 4px;
                 font-size: 12px;
                 flex-direction: column;
+                flex: 1;
             }
             
             .message-group {
@@ -778,6 +788,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             .input-section {
                 padding: 8px;
                 gap: 6px;
+                flex-shrink: 0;
             }
 
             .input-section textarea {
@@ -795,6 +806,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             .status-bar {
                 padding: 6px 8px;
                 font-size: 11px;
+                flex-shrink: 0;
             }
             
             .empty-state {
@@ -844,6 +856,17 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             .contact-number {
                 font-size: 12px !important;
             }
+            
+            .sidebar {
+                padding: 6px !important;
+                gap: 6px !important;
+            }
+            
+            .phone-input-group input,
+            .phone-input-group button {
+                padding: 8px 6px !important;
+                font-size: 12px !important;
+            }
         }
     </style>
 </head>
@@ -853,7 +876,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">📱 Chats</div>
         <div class="phone-input-group">
-            <input type="tel" id="phone" placeholder="Phone number" maxlength="20">
+            <input type="tel" id="phone" placeholder="Phone #" maxlength="20">
             <button onclick="addContact()">Add</button>
         </div>
         <div class="contacts-list" id="contacts"></div>
@@ -1154,9 +1177,9 @@ function renderContacts() {
     const html = contacts.map((p, idx) => {
         const cnt = (chats[p] || []).length;
         const cls = active === p ? 'active' : '';
-        return '<div class="contact-item ' + cls + '" onclick="window.selectContactPhone(' + idx + ')"><div class="contact-number">' + escapeHtml(p) + '</div><div class="contact-count">' + cnt + ' messages</div></div>';
+        return '<div class="contact-item ' + cls + '" onclick="window.selectContactPhone(' + idx + ')"><div class="contact-number">' + escapeHtml(p) + '</div><div class="contact-count">' + cnt + ' msgs</div></div>';
     }).join('');
-    document.getElementById('contacts').innerHTML = html || '<div style="color: #666; text-align: center; padding: 20px; font-size: 12px;">No contacts yet</div>';
+    document.getElementById('contacts').innerHTML = html || '';
 }
 
 window.selectContactPhone = function(idx) {
