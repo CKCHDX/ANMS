@@ -136,12 +136,12 @@ class WebSocketServer(
                 }
             }
             
-            val maskKey = if (isMasked) {
-                ByteArray(4)
+            val maskKey: ByteArray? = if (isMasked) {
+                val mk = ByteArray(4)
                 for (i in 0..3) {
-                    maskKey[i] = reader.read().toByte()
+                    mk[i] = reader.read().toByte()
                 }
-                maskKey
+                mk
             } else null
             
             val payload = ByteArray(payloadLength)
