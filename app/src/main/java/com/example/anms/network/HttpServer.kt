@@ -684,37 +684,42 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 font-size: 13px;
             }
             
+            /* Compact vertical message layout for keitai */
             .messages-area {
-                padding: 6px;
-                gap: 2px;
+                padding: 4px 6px;
+                gap: 3px;
                 font-size: 11px;
-                flex-wrap: wrap;           /* ALLOW WRAPPING */
-                flex-direction: row;       /* SIDE-BY-SIDE instead of column */
+                flex-direction: column;
             }
+            
             .message-group {
                 display: flex;
-                margin-bottom: 0px;        /* was 4px */
+                flex-direction: column;
+                margin-bottom: 0px;
                 animation: fadeIn 0.3s ease-out;
-                width: auto;               /* DONT TAKE FULL WIDTH */
-                max-width: 95%;            /* LIMIT WIDTH SO THEY DONT STRETCH */
+                width: fit-content;
+                max-width: 85%;
             }
+            
             .message-group.in {
-                justify-content: flex-start;
-                margin-right: auto;        /* PUSH RIGHT MESSAGES TO RIGHT */
+                align-items: flex-start;
+                margin-right: auto;
             }
 
             .message-group.out {
-                justify-content: flex-end;
-                margin-left: auto;         /* PUSH LEFT MESSAGES TO LEFT */
+                align-items: flex-end;
+                margin-left: auto;
             }
+            
             .message-bubble {
-                max-width: 100%;           /* was 90% */
-                padding: 6px 8px;          /* was 8px 10px */
-                font-size: 11px;
-                border-radius: 8px;
+                max-width: 100%;
+                padding: 5px 7px;
+                font-size: 10px;
+                border-radius: 6px;
                 word-break: break-word;
-                line-height: 1.25;
+                line-height: 1.2;
             }
+            
             .message-group.in .message-time {
                 text-align: left;
             }
@@ -723,15 +728,14 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 text-align: right;
             }
 
-
             .message-time {
-               font-size: 9px;
-                margin-top: 1px;
-                display: block;            /* Make time appear below bubble */
+                font-size: 8px;
+                margin-top: 0px;
+                display: block;
+                opacity: 0.8;
             }
-
             
-             .input-section {
+            .input-section {
                 padding: 6px;
                 gap: 4px;
             }
@@ -747,7 +751,6 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 padding: 6px 10px;
                 font-size: 10px;
             }
-
             
             .status-bar {
                 padding: 4px 6px;
