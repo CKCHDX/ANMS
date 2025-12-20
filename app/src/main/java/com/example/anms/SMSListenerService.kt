@@ -21,8 +21,16 @@ class SMSListenerService : Service() {
     override fun onCreate() {
         super.onCreate()
         Log.d(tag, "SMS Listener Service created")
-        startForegroundNotification()
-        registerSmsReceiver()
+        try {
+            startForegroundNotification()
+        } catch (e: Exception) {
+            Log.e(tag, "Error starting foreground notification", e)
+        }
+        try {
+            registerSmsReceiver()
+        } catch (e: Exception) {
+            Log.e(tag, "Error registering SMS receiver", e)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -41,7 +49,7 @@ class SMSListenerService : Service() {
                 NotificationManager.IMPORTANCE_LOW
             )
             val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+            manager?.createNotificationChannel(channel)
         }
 
         val notification: Notification = NotificationCompat.Builder(this, channelId)
@@ -58,20 +66,29 @@ class SMSListenerService : Service() {
         val intentFilter = IntentFilter(Telephony.Sms.Intents.SMS_RECEIVED_ACTION)
         intentFilter.priority = 999
         
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            registerReceiver(smsReceiver, intentFilter, Context.RECEIVER_EXPORTED)
-        } else {
-            @Suppress("UnspecifiedRegisterReceiverFlag")
-            registerReceiver(smsReceiver, intentFilter)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                registerReceiver(smsReceiver, intentFilter, Context.RECEIVER_EXPORTED)
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                registerReceiver(smsReceiver, intentFilter, Context.RECEIVER_EXPORTED)
+            } else {
+                @Suppress("UnspecifiedRegisterReceiverFlag")
+                registerReceiver(smsReceiver, intentFilter)
+            }
+            Log.d(tag, "SMS Receiver registered successfully")
+        } catch (e: Exception) {
+            Log.e(tag, "Error registering receiver", e)
         }
-        
-        Log.d(tag, "SMS Receiver registered")
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        if (smsReceiver != null) {
-            unregisterReceiver(smsReceiver)
+        try {
+            if (smsReceiver != null) {
+                unregisterReceiver(smsReceiver)
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error unregistering receiver", e)
         }
         Log.d(tag, "SMS Listener Service destroyed")
     }
