@@ -16,51 +16,57 @@ class SmsDatabase(private val context: Context) {
         val type: Int // 1=received, 2=sent
     )
     
-    fun getConversation(phoneNumber: String, limit: Int = 100): List<SmsMessage> {
+    fun getConversation(phoneNumber: String, limit: Int = 500): List<SmsMessage> {
         return try {
             val messages = mutableListOf<SmsMessage>()
-            
-            // Content URIs for SMS
-            val smsUri = Uri.parse("content://sms/")
             
             // Query both inbox and sent folders
             val inboxUri = Uri.parse("content://sms/inbox")
             val sentUri = Uri.parse("content://sms/sent")
+            val draftUri = Uri.parse("content://sms/draft")
             
             // Get inbox messages
-            messages.addAll(querySms(inboxUri, phoneNumber, 1, limit / 2))
+            messages.addAll(querySms(inboxUri, phoneNumber, 1))
             
             // Get sent messages
-            messages.addAll(querySms(sentUri, phoneNumber, 2, limit / 2))
+            messages.addAll(querySms(sentUri, phoneNumber, 2))
             
-            // Sort by timestamp
+            // Get draft messages
+            messages.addAll(querySms(draftUri, phoneNumber, 3))
+            
+            // Sort by timestamp ascending (oldest first)
             messages.sortBy { it.timestamp }
             
-            Log.d(tag, "Loaded ${messages.size} messages for $phoneNumber")
-            messages
+            // Take last N messages
+            val result = if (messages.size > limit) messages.takeLast(limit) else messages
+            
+            Log.d(tag, "Loaded ${result.size} messages for $phoneNumber (total ${messages.size})")
+            result
         } catch (e: Exception) {
-            Log.e(tag, "Error reading SMS: ${e.message}")
+            Log.e(tag, "Error reading SMS: ${e.message}", e)
             emptyList()
         }
     }
     
-    private fun querySms(uri: Uri, phoneNumber: String, type: Int, limit: Int): List<SmsMessage> {
+    private fun querySms(uri: Uri, phoneNumber: String, type: Int): List<SmsMessage> {
         val messages = mutableListOf<SmsMessage>()
         
         try {
             val projection = arrayOf("_id", "address", "body", "date", "type")
             
-            // Match phone number (handle different formats)
+            // Clean phone number - remove everything except digits and +
             val cleanPhone = phoneNumber.replace("[^0-9+]".toRegex(), "")
-            val selection = "address LIKE ?"
-            val selectionArgs = arrayOf("%$cleanPhone%")
+            val lastDigits = cleanPhone.replace("+", "").takeLast(10)
             
+            Log.d(tag, "Querying $uri for phone: $phoneNumber (clean: $cleanPhone, last10: $lastDigits)")
+            
+            // Try multiple matching strategies
             val cursor: Cursor? = context.contentResolver.query(
                 uri,
                 projection,
-                selection,
-                selectionArgs,
-                "date DESC LIMIT $limit"
+                null,
+                null,
+                "date DESC"
             )
             
             cursor?.use {
@@ -76,23 +82,39 @@ class SmsDatabase(private val context: Context) {
                         val body = it.getString(bodyCol) ?: ""
                         val timestamp = it.getLong(dateCol)
                         
-                        messages.add(SmsMessage(
-                            id = id,
-                            phone = address,
-                            body = body,
-                            timestamp = timestamp,
-                            type = type
-                        ))
+                        // Match phone number - check various formats
+                        if (phoneNumberMatches(address, cleanPhone, lastDigits)) {
+                            messages.add(SmsMessage(
+                                id = id,
+                                phone = address,
+                                body = body,
+                                timestamp = timestamp,
+                                type = type
+                            ))
+                        }
                     } catch (e: Exception) {
                         Log.e(tag, "Error parsing SMS row: ${e.message}")
                     }
                 }
             }
+            
+            Log.d(tag, "Found ${messages.size} messages in $uri")
         } catch (e: Exception) {
-            Log.e(tag, "Error querying SMS: ${e.message}")
+            Log.e(tag, "Error querying SMS: ${e.message}", e)
         }
         
         return messages
+    }
+    
+    private fun phoneNumberMatches(address: String, cleanPhone: String, lastDigits: String): Boolean {
+        val cleanAddress = address.replace("[^0-9+]".toRegex(), "")
+        val addressLastDigits = cleanAddress.replace("+", "").takeLast(10)
+        
+        return cleanAddress == cleanPhone || 
+               cleanAddress.endsWith(lastDigits) ||
+               cleanPhone.endsWith(addressLastDigits) ||
+               address.contains(cleanPhone) ||
+               address == cleanPhone
     }
     
     fun getAllConversations(limit: Int = 50): Map<String, List<SmsMessage>> {
@@ -107,7 +129,7 @@ class SmsDatabase(private val context: Context) {
                 projection,
                 null,
                 null,
-                "date DESC LIMIT ${limit * 10}"
+                "date DESC"
             )
             
             cursor?.use {
@@ -117,31 +139,35 @@ class SmsDatabase(private val context: Context) {
                 val dateCol = it.getColumnIndex("date")
                 val typeCol = it.getColumnIndex("type")
                 
-                while (it.moveToNext()) {
+                var count = 0
+                while (it.moveToNext() && count < limit * 10) {
                     try {
                         val id = it.getString(idCol)
                         val address = it.getString(addressCol) ?: "Unknown"
                         val body = it.getString(bodyCol) ?: ""
                         val timestamp = it.getLong(dateCol)
-                        val type = it.getInt(typeCol)
+                        val typeVal = it.getInt(typeCol)
                         
                         if (!conversations.containsKey(address)) {
                             conversations[address] = mutableListOf()
                         }
-                        conversations[address]?.add(SmsMessage(id, address, body, timestamp, type))
+                        conversations[address]?.add(SmsMessage(id, address, body, timestamp, typeVal))
+                        count++
                     } catch (e: Exception) {
                         Log.e(tag, "Error parsing SMS: ${e.message}")
                     }
                 }
             }
             
-            // Sort messages within each conversation
-            conversations.forEach { (_, msgs) -> msgs.sortBy { it.timestamp } }
+            // Sort messages within each conversation and limit size
+            conversations.forEach { (_, msgs) -> 
+                msgs.sortBy { it.timestamp }
+            }
             
             Log.d(tag, "Loaded ${conversations.size} conversations")
             conversations
         } catch (e: Exception) {
-            Log.e(tag, "Error reading conversations: ${e.message}")
+            Log.e(tag, "Error reading conversations: ${e.message}", e)
             emptyMap()
         }
     }
