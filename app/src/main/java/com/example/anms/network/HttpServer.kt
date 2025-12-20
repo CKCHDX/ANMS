@@ -130,9 +130,14 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             val allMessages = smsDb.getConversation(phone, 500)
             Log.d(tag, "Got ${allMessages.size} total messages")
 
-            // Paginate: get messages from offset to offset+limit
-            val paginatedMessages = if (offset < allMessages.size) {
-                allMessages.subList(offset, minOf(offset + limit, allMessages.size))
+            // Pagination from END of conversation (most recent messages)
+            // offset=0 means get the LAST 'limit' messages
+            // offset=8 means skip last 8, get next 8, etc.
+            val startIndex = maxOf(0, allMessages.size - limit - offset)
+            val endIndex = allMessages.size - offset
+            
+            val paginatedMessages = if (startIndex < endIndex && endIndex > 0) {
+                allMessages.subList(startIndex, endIndex)
             } else {
                 emptyList()
             }
@@ -144,7 +149,8 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 """{"body":"$cleanBody","dir":"$dir","time":"$time"}"""
             }
 
-            val body = """{"messages":[$json],"total":${allMessages.size},"offset":$offset,"limit":$limit,"hasMore":${offset + limit < allMessages.size}}"""
+            val hasMore = (allMessages.size - offset - limit) > 0
+            val body = """{"messages":[$json],"total":${allMessages.size},"offset":$offset,"limit":$limit,"hasMore":$hasMore}"""
             val contentLength = body.toByteArray().size
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: $contentLength\r\nConnection: close\r\n\r\n$body"
         } catch (e: Exception) {
