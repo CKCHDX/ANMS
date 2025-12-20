@@ -12,9 +12,7 @@ import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.recyclerview.widget.RecyclerView
 import com.example.anms.network.HttpServer
-import com.example.anms.network.WebSocketServer
 import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
@@ -22,26 +20,17 @@ class MainActivity : AppCompatActivity() {
     private val permissionRequestCode = 42
     
     private var httpServer: HttpServer? = null
-    private var wsServer: WebSocketServer? = null
-    private var isServersRunning = false
+    private var isServerRunning = false
     private var startTime: Long = 0
     private var messageCount = 0
-    private var clientCount = 0
     
     private lateinit var statusDot: View
     private lateinit var statusText: TextView
-    private lateinit var clientCountText: TextView
     private lateinit var messageCountText: TextView
     private lateinit var uptimeText: TextView
     private lateinit var startBtn: Button
     private lateinit var stopBtn: Button
     private lateinit var restartBtn: Button
-    private lateinit var messagesTabBtn: Button
-    private lateinit var logsTabBtn: Button
-    private lateinit var smsTabBtn: Button
-    private lateinit var messagesTab: LinearLayout
-    private lateinit var logsTab: LinearLayout
-    private lateinit var smsTab: LinearLayout
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,7 +65,6 @@ class MainActivity : AppCompatActivity() {
     private fun initViews() {
         statusDot = findViewById(R.id.statusDot)
         statusText = findViewById(R.id.statusText)
-        clientCountText = findViewById(R.id.clientCountText)
         messageCountText = findViewById(R.id.messageCountText)
         uptimeText = findViewById(R.id.uptimeText)
         
@@ -84,30 +72,18 @@ class MainActivity : AppCompatActivity() {
         stopBtn = findViewById(R.id.stopServerButton)
         restartBtn = findViewById(R.id.restartServerButton)
         
-        messagesTabBtn = findViewById(R.id.messagesTabButton)
-        logsTabBtn = findViewById(R.id.logsTabButton)
-        smsTabBtn = findViewById(R.id.smsTabButton)
-        
-        messagesTab = findViewById(R.id.messagesTab)
-        logsTab = findViewById(R.id.logsTab)
-        smsTab = findViewById(R.id.smsTab)
-        
         updateStatusUI()
     }
     
     private fun setupButtons() {
-        startBtn.setOnClickListener { startServers() }
-        stopBtn.setOnClickListener { stopServers() }
-        restartBtn.setOnClickListener { restartServers() }
-        
-        messagesTabBtn.setOnClickListener { switchTab(0) }
-        logsTabBtn.setOnClickListener { switchTab(1) }
-        smsTabBtn.setOnClickListener { switchTab(2) }
+        startBtn.setOnClickListener { startServer() }
+        stopBtn.setOnClickListener { stopServer() }
+        restartBtn.setOnClickListener { restartServer() }
     }
     
-    private fun startServers() {
-        if (isServersRunning) {
-            Log.d(tag, "Servers already running")
+    private fun startServer() {
+        if (isServerRunning) {
+            Log.d(tag, "Server already running")
             return
         }
         
@@ -115,41 +91,32 @@ class MainActivity : AppCompatActivity() {
             try {
                 httpServer = HttpServer(this@MainActivity, 8080)
                 httpServer?.start()
-                Log.d(tag, "HTTP Server started")
+                Log.d(tag, "HTTP Server started on port 8080")
                 
-                wsServer = WebSocketServer(this@MainActivity, 8765) { message ->
-                    messageCount++
-                    updateStatsUI()
-                }
-                wsServer?.start()
-                Log.d(tag, "WebSocket Server started")
-                
-                isServersRunning = true
+                isServerRunning = true
                 startTime = System.currentTimeMillis()
                 
                 runOnUiThread {
                     updateStatusUI()
-                    statusText.text = "Online"
+                    statusText.text = "Online - Open http://YOUR_IP:8080 in browser"
                     statusDot.setBackgroundColor(android.graphics.Color.GREEN)
                 }
             } catch (e: Exception) {
-                Log.e(tag, "Error starting servers", e)
+                Log.e(tag, "Error starting server", e)
                 runOnUiThread {
-                    statusText.text = "Error"
+                    statusText.text = "Error: ${e.message}"
                     statusDot.setBackgroundColor(android.graphics.Color.RED)
                 }
             }
         }
     }
     
-    private fun stopServers() {
+    private fun stopServer() {
         thread {
             try {
                 httpServer?.stopServer()
-                wsServer?.stopServer()
-                isServersRunning = false
+                isServerRunning = false
                 messageCount = 0
-                clientCount = 0
                 
                 runOnUiThread {
                     updateStatusUI()
@@ -158,54 +125,21 @@ class MainActivity : AppCompatActivity() {
                     uptimeText.text = "0s"
                 }
             } catch (e: Exception) {
-                Log.e(tag, "Error stopping servers", e)
+                Log.e(tag, "Error stopping server", e)
             }
         }
     }
     
-    private fun restartServers() {
-        stopServers()
+    private fun restartServer() {
+        stopServer()
         thread {
             Thread.sleep(500)
-            startServers()
-        }
-    }
-    
-    private fun switchTab(tabIndex: Int) {
-        messagesTab.visibility = View.GONE
-        logsTab.visibility = View.GONE
-        smsTab.visibility = View.GONE
-        
-        messagesTabBtn.setBackgroundColor(android.graphics.Color.LTGRAY)
-        logsTabBtn.setBackgroundColor(android.graphics.Color.LTGRAY)
-        smsTabBtn.setBackgroundColor(android.graphics.Color.LTGRAY)
-        
-        when (tabIndex) {
-            0 -> {
-                messagesTab.visibility = View.VISIBLE
-                messagesTabBtn.setBackgroundColor(android.graphics.Color.parseColor("#667eea"))
-            }
-            1 -> {
-                logsTab.visibility = View.VISIBLE
-                logsTabBtn.setBackgroundColor(android.graphics.Color.parseColor("#667eea"))
-            }
-            2 -> {
-                smsTab.visibility = View.VISIBLE
-                smsTabBtn.setBackgroundColor(android.graphics.Color.parseColor("#667eea"))
-            }
+            startServer()
         }
     }
     
     private fun updateStatusUI() {
-        clientCountText.text = clientCount.toString()
         messageCountText.text = messageCount.toString()
-    }
-    
-    private fun updateStatsUI() {
-        runOnUiThread {
-            clientCountText.text = clientCount.toString()
-            messageCountText.text = messageCount.toString()
-        }
     }
     
     private fun startUptimeTimer() {
@@ -213,7 +147,7 @@ class MainActivity : AppCompatActivity() {
             while (true) {
                 try {
                     Thread.sleep(1000)
-                    if (isServersRunning) {
+                    if (isServerRunning) {
                         val elapsed = (System.currentTimeMillis() - startTime) / 1000
                         runOnUiThread {
                             uptimeText.text = formatUptime(elapsed)
@@ -239,6 +173,6 @@ class MainActivity : AppCompatActivity() {
     
     override fun onDestroy() {
         super.onDestroy()
-        stopServers()
+        stopServer()
     }
 }
