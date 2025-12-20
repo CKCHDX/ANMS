@@ -7,9 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
-import android.widget.LinearLayout
 import android.widget.TextView
-import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -28,7 +26,6 @@ class MainActivity : AppCompatActivity() {
     private var startTime: Long = 0
     private var messageCount = 0
     
-    private lateinit var statusDot: View
     private lateinit var statusText: TextView
     private lateinit var messageCountText: TextView
     private lateinit var uptimeText: TextView
@@ -40,11 +37,15 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         
-        requestPermissions()
-        initViews()
-        setupButtons()
-        startUptimeTimer()
-        startSMSService()
+        try {
+            requestPermissions()
+            initViews()
+            setupButtons()
+            startUptimeTimer()
+            startSMSService()
+        } catch (e: Exception) {
+            Log.e(tag, "Error in onCreate", e)
+        }
     }
     
     private fun requestPermissions() {
@@ -69,32 +70,43 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun startSMSService() {
-        val serviceIntent = Intent(this, SMSListenerService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent)
-        } else {
-            startService(serviceIntent)
+        try {
+            val serviceIntent = Intent(this, SMSListenerService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
+            Log.d(tag, "SMS Listener Service started")
+        } catch (e: Exception) {
+            Log.e(tag, "Error starting SMS service", e)
         }
-        Log.d(tag, "SMS Listener Service started")
     }
     
     private fun initViews() {
-        statusDot = findViewById(R.id.statusDot)
-        statusText = findViewById(R.id.statusText)
-        messageCountText = findViewById(R.id.messageCountText)
-        uptimeText = findViewById(R.id.uptimeText)
-        
-        startBtn = findViewById(R.id.startServerButton)
-        stopBtn = findViewById(R.id.stopServerButton)
-        restartBtn = findViewById(R.id.restartServerButton)
-        
-        updateStatusUI()
+        try {
+            statusText = findViewById(R.id.statusText)
+            messageCountText = findViewById(R.id.messageCountText)
+            uptimeText = findViewById(R.id.uptimeText)
+            
+            startBtn = findViewById(R.id.startServerButton)
+            stopBtn = findViewById(R.id.stopServerButton)
+            restartBtn = findViewById(R.id.restartServerButton)
+            
+            updateStatusUI()
+        } catch (e: Exception) {
+            Log.e(tag, "Error initializing views", e)
+        }
     }
     
     private fun setupButtons() {
-        startBtn.setOnClickListener { startServer() }
-        stopBtn.setOnClickListener { stopServer() }
-        restartBtn.setOnClickListener { restartServer() }
+        try {
+            startBtn.setOnClickListener { startServer() }
+            stopBtn.setOnClickListener { stopServer() }
+            restartBtn.setOnClickListener { restartServer() }
+        } catch (e: Exception) {
+            Log.e(tag, "Error setting up buttons", e)
+        }
     }
     
     private fun startServer() {
@@ -121,15 +133,21 @@ class MainActivity : AppCompatActivity() {
                 startTime = System.currentTimeMillis()
                 
                 runOnUiThread {
-                    updateStatusUI()
-                    statusText.text = "Online - Open http://YOUR_IP:8080"
-                    statusDot.setBackgroundColor(android.graphics.Color.GREEN)
+                    try {
+                        updateStatusUI()
+                        statusText.text = "Online - Open http://YOUR_IP:8080"
+                    } catch (e: Exception) {
+                        Log.e(tag, "Error updating UI", e)
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(tag, "Error starting server", e)
                 runOnUiThread {
-                    statusText.text = "Error: ${e.message}"
-                    statusDot.setBackgroundColor(android.graphics.Color.RED)
+                    try {
+                        statusText.text = "Error: ${e.message}"
+                    } catch (ex: Exception) {
+                        Log.e(tag, "Error updating error UI", ex)
+                    }
                 }
             }
         }
@@ -145,10 +163,13 @@ class MainActivity : AppCompatActivity() {
                 messageCount = 0
                 
                 runOnUiThread {
-                    updateStatusUI()
-                    statusText.text = "Offline"
-                    statusDot.setBackgroundColor(android.graphics.Color.RED)
-                    uptimeText.text = "0s"
+                    try {
+                        updateStatusUI()
+                        statusText.text = "Offline"
+                        uptimeText.text = "0s"
+                    } catch (e: Exception) {
+                        Log.e(tag, "Error updating UI", e)
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(tag, "Error stopping server", e)
@@ -165,7 +186,11 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun updateStatusUI() {
-        messageCountText.text = messageCount.toString()
+        try {
+            messageCountText.text = messageCount.toString()
+        } catch (e: Exception) {
+            Log.e(tag, "Error updating status UI", e)
+        }
     }
     
     private fun startUptimeTimer() {
@@ -176,7 +201,11 @@ class MainActivity : AppCompatActivity() {
                     if (isServerRunning) {
                         val elapsed = (System.currentTimeMillis() - startTime) / 1000
                         runOnUiThread {
-                            uptimeText.text = formatUptime(elapsed)
+                            try {
+                                uptimeText.text = formatUptime(elapsed)
+                            } catch (e: Exception) {
+                                Log.e(tag, "Error updating uptime", e)
+                            }
                         }
                     }
                 } catch (e: Exception) {
@@ -199,6 +228,10 @@ class MainActivity : AppCompatActivity() {
     
     override fun onDestroy() {
         super.onDestroy()
-        stopServer()
+        try {
+            stopServer()
+        } catch (e: Exception) {
+            Log.e(tag, "Error in onDestroy", e)
+        }
     }
 }
