@@ -3,159 +3,246 @@ package com.example.anms
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
-import android.os.Bundle
-import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import android.os.Bundle
+import android.util.Log
+import android.widget.Button
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.View
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.example.anms.databinding.ActivityMainBinding
 import com.example.anms.network.HttpServer
 import com.example.anms.network.WebSocketServer
-import com.example.anms.sms.SmsManager
+import kotlinx.coroutines.delay
+import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var binding: ActivityMainBinding
-    private lateinit var webSocketServer: WebSocketServer
+    private val tag = "ANMS_Main"
+    private val permissionRequestCode = 42
+    
     private var httpServer: HttpServer? = null
-    private lateinit var smsManager: SmsManager
-    private lateinit var messageAdapter: MessageAdapter
-
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val allGranted = permissions.values.all { it }
-        if (allGranted) {
-            initializeApp()
-        } else {
-            Toast.makeText(
-                this,
-                getString(R.string.permissions_required),
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
-
+    private var wsServer: WebSocketServer? = null
+    private var isServersRunning = false
+    private var startTime: Long = 0
+    private var messageCount = 0
+    private var clientCount = 0
+    
+    // UI Elements
+    private lateinit var statusDot: View
+    private lateinit var statusText: TextView
+    private lateinit var clientCountText: TextView
+    private lateinit var messageCountText: TextView
+    private lateinit var uptimeText: TextView
+    private lateinit var startBtn: Button
+    private lateinit var stopBtn: Button
+    private lateinit var restartBtn: Button
+    private lateinit var messagesTabBtn: Button
+    private lateinit var logsTabBtn: Button
+    private lateinit var smsTabBtn: Button
+    private lateinit var messagesTab: LinearLayout
+    private lateinit var logsTab: LinearLayout
+    private lateinit var smsTab: LinearLayout
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-
-        setupPermissions()
-        setupUI()
+        setContentView(R.layout.activity_main)
+        
+        requestPermissions()
+        initViews()
+        setupButtons()
+        startUptimeTimer()
     }
-
-    private fun setupPermissions() {
+    
+    private fun requestPermissions() {
         val permissions = mutableListOf(
             Manifest.permission.SEND_SMS,
             Manifest.permission.RECEIVE_SMS,
-            Manifest.permission.READ_SMS,
-            Manifest.permission.READ_CONTACTS,
-            Manifest.permission.INTERNET
+            Manifest.permission.READ_SMS
         )
-
+        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             permissions.add(Manifest.permission.READ_PHONE_NUMBERS)
         }
-
-        val missingPermissions = permissions.filter {
-            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-        }
-
-        if (missingPermissions.isNotEmpty()) {
-            requestPermissionLauncher.launch(missingPermissions.toTypedArray())
-        } else {
-            initializeApp()
-        }
-    }
-
-    private fun setupUI() {
-        messageAdapter = MessageAdapter()
-        binding.messagesRecyclerView.apply {
-            adapter = messageAdapter
-            layoutManager = LinearLayoutManager(this@MainActivity).apply {
-                stackFromEnd = true
-            }
-        }
-
-        binding.sendButton.setOnClickListener {
-            val phoneNumber = binding.phoneNumberInput.text.toString().trim()
-            val message = binding.messageInput.text.toString().trim()
-
-            if (phoneNumber.isNotEmpty() && message.isNotEmpty()) {
-                if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) {
-                    try {
-                        smsManager.sendSms(phoneNumber, message)
-                        messageAdapter.addMessage(
-                            Message(
-                                phoneNumber = phoneNumber,
-                                content = message,
-                                timestamp = System.currentTimeMillis(),
-                                isOutgoing = true
-                            )
-                        )
-                        binding.messageInput.text.clear()
-                        binding.messagesRecyclerView.scrollToPosition(messageAdapter.itemCount - 1)
-                        Toast.makeText(this, getString(R.string.message_sent), Toast.LENGTH_SHORT).show()
-                    } catch (e: SecurityException) {
-                        Toast.makeText(this, getString(R.string.permission_denied), Toast.LENGTH_SHORT).show()
-                    }
-                } else {
-                    Toast.makeText(this, getString(R.string.permission_required_sms), Toast.LENGTH_SHORT).show()
-                }
-            } else {
-                Toast.makeText(this, getString(R.string.fill_all_fields), Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        binding.serverStatusTextView.text = getString(R.string.initializing)
-    }
-
-    private fun initializeApp() {
-        smsManager = SmsManager(this) { incomingMessage ->
-            messageAdapter.addMessage(incomingMessage)
-            binding.messagesRecyclerView.scrollToPosition(messageAdapter.itemCount - 1)
-            webSocketServer.broadcastMessage(incomingMessage)
-        }
-
-        webSocketServer = WebSocketServer(this, 8765) { clientMessage ->
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) {
-                try {
-                    smsManager.sendSms(clientMessage.phoneNumber, clientMessage.content)
-                    messageAdapter.addMessage(
-                        Message(
-                            phoneNumber = clientMessage.phoneNumber,
-                            content = clientMessage.content,
-                            timestamp = System.currentTimeMillis(),
-                            isOutgoing = true
-                        )
-                    )
-                    binding.messagesRecyclerView.scrollToPosition(messageAdapter.itemCount - 1)
-                } catch (e: SecurityException) {
-                    e.printStackTrace()
-                }
-            }
-        }
-
-        webSocketServer.start()
         
-        // Start HTTP server to serve web client
-        try {
-            httpServer = HttpServer(this, 8080)
-            binding.serverStatusTextView.text = getString(R.string.server_running) + "\nHTTP: 8080 | WS: 8765"
-        } catch (e: Exception) {
-            binding.serverStatusTextView.text = "HTTP Server Error: ${e.message}"
-            Toast.makeText(this, "HTTP Server failed: ${e.message}", Toast.LENGTH_LONG).show()
+        val missingPerms = permissions.filter { perm ->
+            ContextCompat.checkSelfPermission(this, perm) != PackageManager.PERMISSION_GRANTED
+        }
+        
+        if (missingPerms.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, missingPerms.toTypedArray(), permissionRequestCode)
         }
     }
-
+    
+    private fun initViews() {
+        // Status
+        statusDot = findViewById(R.id.statusDot)
+        statusText = findViewById(R.id.statusText)
+        clientCountText = findViewById(R.id.clientCountText)
+        messageCountText = findViewById(R.id.messageCountText)
+        uptimeText = findViewById(R.id.uptimeText)
+        
+        // Control Buttons
+        startBtn = findViewById(R.id.startServerButton)
+        stopBtn = findViewById(R.id.stopServerButton)
+        restartBtn = findViewById(R.id.restartServerButton)
+        
+        // Tab Buttons
+        messagesTabBtn = findViewById(R.id.messagesTabButton)
+        logsTabBtn = findViewById(R.id.logsTabButton)
+        smsTabBtn = findViewById(R.id.smsTabButton)
+        
+        // Tabs
+        messagesTab = findViewById(R.id.messagesTab)
+        logsTab = findViewById(R.id.logsTab)
+        smsTab = findViewById(R.id.smsTab)
+        
+        updateStatusUI()
+    }
+    
+    private fun setupButtons() {
+        startBtn.setOnClickListener { startServers() }
+        stopBtn.setOnClickListener { stopServers() }
+        restartBtn.setOnClickListener { restartServers() }
+        
+        messagesTabBtn.setOnClickListener { switchTab(0) }
+        logsTabBtn.setOnClickListener { switchTab(1) }
+        smsTabBtn.setOnClickListener { switchTab(2) }
+    }
+    
+    private fun startServers() {
+        if (isServersRunning) {
+            Log.d(tag, "Servers already running")
+            return
+        }
+        
+        thread {
+            try {
+                httpServer = HttpServer(this, 8080)
+                httpServer?.start()
+                Log.d(tag, "HTTP Server started")
+                
+                wsServer = WebSocketServer(this, 8765) { message ->
+                    messageCount++
+                    updateStatsUI()
+                }
+                wsServer?.start()
+                Log.d(tag, "WebSocket Server started")
+                
+                isServersRunning = true
+                startTime = System.currentTimeMillis()
+                
+                runOnUiThread {
+                    updateStatusUI()
+                    statusText.text = "Online"
+                    statusDot.setBackgroundColor(ContextCompat.getColor(this@MainActivity, android.R.color.holo_green_light))
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "Error starting servers", e)
+                runOnUiThread {
+                    statusText.text = "Error"
+                    statusDot.setBackgroundColor(ContextCompat.getColor(this@MainActivity, android.R.color.holo_red_light))
+                }
+            }
+        }
+    }
+    
+    private fun stopServers() {
+        thread {
+            try {
+                httpServer?.stopServer()
+                wsServer?.stopServer()
+                isServersRunning = false
+                messageCount = 0
+                clientCount = 0
+                
+                runOnUiThread {
+                    updateStatusUI()
+                    statusText.text = "Offline"
+                    statusDot.setBackgroundColor(ContextCompat.getColor(this@MainActivity, android.R.color.holo_red_light))
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "Error stopping servers", e)
+            }
+        }
+    }
+    
+    private fun restartServers() {
+        stopServers()
+        thread {
+            Thread.sleep(500)
+            startServers()
+        }
+    }
+    
+    private fun switchTab(tabIndex: Int) {
+        // Hide all tabs
+        messagesTab.visibility = View.GONE
+        logsTab.visibility = View.GONE
+        smsTab.visibility = View.GONE
+        
+        // Reset button colors
+        messagesTabBtn.setBackgroundColor(ContextCompat.getColor(this, android.R.color.darker_gray))
+        logsTabBtn.setBackgroundColor(ContextCompat.getColor(this, android.R.color.darker_gray))
+        smsTabBtn.setBackgroundColor(ContextCompat.getColor(this, android.R.color.darker_gray))
+        
+        // Show selected tab and highlight button
+        when (tabIndex) {
+            0 -> {
+                messagesTab.visibility = View.VISIBLE
+                messagesTabBtn.setBackgroundColor(ContextCompat.getColor(this, android.R.color.holo_blue_light))
+            }
+            1 -> {
+                logsTab.visibility = View.VISIBLE
+                logsTabBtn.setBackgroundColor(ContextCompat.getColor(this, android.R.color.holo_blue_light))
+            }
+            2 -> {
+                smsTab.visibility = View.VISIBLE
+                smsTabBtn.setBackgroundColor(ContextCompat.getColor(this, android.R.color.holo_blue_light))
+            }
+        }
+    }
+    
+    private fun updateStatusUI() {
+        clientCountText.text = clientCount.toString()
+        messageCountText.text = messageCount.toString()
+    }
+    
+    private fun updateStatsUI() {
+        clientCountText.text = clientCount.toString()
+        messageCountText.text = messageCount.toString()
+    }
+    
+    private fun startUptimeTimer() {
+        thread {
+            while (true) {
+                Thread.sleep(1000)
+                if (isServersRunning) {
+                    val elapsed = (System.currentTimeMillis() - startTime) / 1000
+                    runOnUiThread {
+                        uptimeText.text = formatUptime(elapsed)
+                    }
+                }
+            }
+        }
+    }
+    
+    private fun formatUptime(seconds: Long): String {
+        val hours = seconds / 3600
+        val minutes = (seconds % 3600) / 60
+        val secs = seconds % 60
+        return when {
+            hours > 0 -> String.format("%02d:%02d:%02d", hours, minutes, secs)
+            minutes > 0 -> String.format("%02d:%02d", minutes, secs)
+            else -> "${secs}s"
+        }
+    }
+    
     override fun onDestroy() {
         super.onDestroy()
-        if (::webSocketServer.isInitialized) {
-            webSocketServer.stopServer()
-        }
-        if (httpServer != null) {
-            httpServer?.stopServer()
-        }
+        stopServers()
     }
 }
