@@ -46,11 +46,11 @@ class HttpServer(context: Context, private val port: Int = 8080) {
             val method = parts.getOrNull(0) ?: "GET"
             val path = parts.getOrNull(1) ?: "/"
 
-            Log.d(tag, "$method $path")
+            Log.d(tag, "$method $path from ${clientSocket.inetAddress.hostAddress}")
 
             val response = when {
                 path == "/" || path == "/index.html" -> {
-                    sendHtmlResponse(getIndexHtml())
+                    sendHtmlResponse(getIndexHtml(clientSocket.inetAddress.hostAddress))
                 }
                 else -> sendNotFound()
             }
@@ -77,7 +77,7 @@ class HttpServer(context: Context, private val port: Int = 8080) {
         return "HTTP/1.1 404 Not Found\nContent-Type: text/html\nContent-Length: ${body.toByteArray().size}\nConnection: close\n\n$body"
     }
 
-    private fun getIndexHtml(): String {
+    private fun getIndexHtml(clientIp: String): String {
         return """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -111,6 +111,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
 textarea { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; resize: none; height: 40px; font-family: inherit; }
 button { padding: 10px 16px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; }
 button:hover { background: #5568d3; }
+button:disabled { background: #ccc; cursor: not-allowed; }
 input.add-phone { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 8px; }
 .loading { font-size: 11px; color: #999; padding: 8px 12px; }
 </style>
@@ -142,30 +143,60 @@ input.add-phone { width: 100%; padding: 10px; border: 1px solid #ddd; border-rad
 </div>
 </div>
 <script>
+const SERVER_IP = '$clientIp';
 const STATE = { ws: null, connected: false, active: null, chats: {}, loading: {} };
 const DOM = { dot: document.getElementById('dot'), status: document.getElementById('status'), newPhone: document.getElementById('newPhone'), msg: document.getElementById('msg'), send: document.getElementById('send'), msgs: document.getElementById('msgs'), chatTitle: document.getElementById('chatTitle'), contactsList: document.getElementById('contactsList') };
 
+console.log('Server IP:', SERVER_IP);
+
 function connect() {
-const host = localStorage.getItem('anms_host') || location.hostname + ':8765';
-STATE.ws = new WebSocket('ws://' + host);
-STATE.ws.onopen = () => { STATE.connected = true; DOM.dot.classList.remove('offline'); DOM.status.textContent = 'Connected'; if(STATE.active) { DOM.msg.disabled = false; DOM.send.disabled = false; } };
-STATE.ws.onmessage = (e) => { handleWSMessage(e.data); };
-STATE.ws.onerror = () => { DOM.dot.classList.add('offline'); DOM.status.textContent = 'Error'; };
-STATE.ws.onclose = () => { STATE.connected = false; DOM.dot.classList.add('offline'); DOM.status.textContent = 'Disconnected'; DOM.msg.disabled = true; DOM.send.disabled = true; setTimeout(connect, 3000); };
+const wsUrl = 'ws://' + SERVER_IP + ':8765';
+console.log('Connecting to:', wsUrl);
+STATE.ws = new WebSocket(wsUrl);
+STATE.ws.onopen = () => { 
+  console.log('WebSocket connected');
+  STATE.connected = true; 
+  DOM.dot.classList.remove('offline'); 
+  DOM.status.textContent = 'Connected'; 
+  if(STATE.active) { DOM.msg.disabled = false; DOM.send.disabled = false; } 
+};
+STATE.ws.onmessage = (e) => { 
+  console.log('Received:', e.data);
+  handleWSMessage(e.data); 
+};
+STATE.ws.onerror = (err) => { 
+  console.error('WebSocket error:', err);
+  DOM.dot.classList.add('offline'); 
+  DOM.status.textContent = 'Error'; 
+};
+STATE.ws.onclose = () => { 
+  console.log('WebSocket closed');
+  STATE.connected = false; 
+  DOM.dot.classList.add('offline'); 
+  DOM.status.textContent = 'Disconnected'; 
+  DOM.msg.disabled = true; 
+  DOM.send.disabled = true; 
+  setTimeout(connect, 3000); 
+};
 }
 
 function handleWSMessage(data) {
 if (data.startsWith('SMS_HISTORY|')) {
+try {
 const json = JSON.parse(data.substring(12));
 const phone = json.phone;
 if(!STATE.chats[phone]) STATE.chats[phone] = [];
 STATE.chats[phone] = json.messages.map(m => ({
 out: m.direction === 'sent',
 text: m.body,
-time: m.timestamp.split(' ')[1]
+time: m.timestamp.split(' ')[1] || m.timestamp
 }));
 if(STATE.active === phone) render();
 STATE.loading[phone] = false;
+} catch(e) {
+console.error('Error parsing SMS history:', e);
+STATE.loading[STATE.active] = false;
+}
 } else if (data.startsWith('SMS|')) {
 const parts = data.split('|');
 const phone = parts[1];
@@ -173,8 +204,9 @@ const text = parts[2];
 const dir = parts[3];
 addMsg(phone, text, dir === 'sent');
 } else {
-const p = data.split('|')[0];
-const t = data.split('|')[1];
+const parts = data.split('|');
+const p = parts[0];
+const t = parts.slice(1).join('|');
 if(p && t) addMsg(p, t, false);
 }
 }
@@ -194,6 +226,7 @@ DOM.chatTitle.textContent = 'Chat: ' + phone;
 if(!STATE.chats[phone] || STATE.chats[phone].length === 0) {
 if(!STATE.loading[phone]) {
 STATE.loading[phone] = true;
+console.log('Requesting SMS history for:', phone);
 STATE.ws.send('GET_SMS_HISTORY:' + phone);
 }
 }
@@ -217,10 +250,15 @@ DOM.msgs.scrollTop = DOM.msgs.scrollHeight;
 }
 
 function send() { 
-if(!STATE.active || !STATE.connected) return; 
+if(!STATE.active || !STATE.connected) {
+  console.error('Cannot send: active=' + STATE.active + ', connected=' + STATE.connected);
+  return; 
+}
 const t = DOM.msg.value.trim(); 
 if(!t) return; 
-STATE.ws.send('SEND_SMS|' + STATE.active + '|' + t);
+const cmd = 'SEND_SMS|' + STATE.active + '|' + t;
+console.log('Sending:', cmd);
+STATE.ws.send(cmd);
 addMsg(STATE.active, t, true); 
 DOM.msg.value = ''; 
 DOM.msg.focus(); 
