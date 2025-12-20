@@ -71,6 +71,15 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                     Log.d(tag, "Raw phone: $phone")
                     handleGetChat(phone)
                 }
+                path.startsWith("/api/messages/") -> {
+                    // New pagination endpoint: /api/messages/{phone}?offset=0&limit=50
+                    val pathParts = path.substring(14).split("?")
+                    val phone = URLDecoder.decode(pathParts[0], "UTF-8")
+                    val queryString = pathParts.getOrNull(1) ?: ""
+                    val offset = queryString.split("&").find { it.startsWith("offset=") }?.substring(7)?.toIntOrNull() ?: 0
+                    val limit = queryString.split("&").find { it.startsWith("limit=") }?.substring(6)?.toIntOrNull() ?: 50
+                    handleGetMessages(phone, offset, limit)
+                }
                 path.startsWith("/send") && method == "POST" -> {
                     val body = if (contentLength > 0) {
                         val chars = CharArray(contentLength)
@@ -111,6 +120,35 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: $contentLength\r\nConnection: close\r\n\r\n$body"
         } catch (e: Exception) {
             Log.e(tag, "Error loading chat: ${e.message}", e)
+            jsonResponse(false, "Error: ${e.message}")
+        }
+    }
+
+    private fun handleGetMessages(phone: String, offset: Int, limit: Int): String {
+        return try {
+            Log.d(tag, "Loading messages for: $phone (offset=$offset, limit=$limit)")
+            val allMessages = smsDb.getConversation(phone, 500)
+            Log.d(tag, "Got ${allMessages.size} total messages")
+
+            // Paginate: get messages from offset to offset+limit
+            val paginatedMessages = if (offset < allMessages.size) {
+                allMessages.subList(offset, minOf(offset + limit, allMessages.size))
+            } else {
+                emptyList()
+            }
+
+            val json = paginatedMessages.joinToString(",") { msg ->
+                val dir = if (msg.type == 1) "in" else "out"
+                val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(msg.timestamp)
+                val cleanBody = msg.body.replace("\\", " ").replace("\"", "\\\"")
+                """{"body":"$cleanBody","dir":"$dir","time":"$time"}"""
+            }
+
+            val body = """{"messages":[$json],"total":${allMessages.size},"offset":$offset,"limit":$limit,"hasMore":${offset + limit < allMessages.size}}"""
+            val contentLength = body.toByteArray().size
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: $contentLength\r\nConnection: close\r\n\r\n$body"
+        } catch (e: Exception) {
+            Log.e(tag, "Error loading messages: ${e.message}", e)
             jsonResponse(false, "Error: ${e.message}")
         }
     }
@@ -331,6 +369,28 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             display: flex;
             flex-direction: column;
             gap: 8px;
+        }
+        
+        .load-older-btn {
+            padding: 8px 12px;
+            background: #252525;
+            border: 1px solid #333;
+            border-radius: 6px;
+            color: #e0e0e0;
+            font-size: 12px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+            margin: 8px 0;
+        }
+        
+        .load-older-btn:hover {
+            background: #303030;
+        }
+        
+        .load-older-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
         
         .message-group {
@@ -837,6 +897,8 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
 <script>
 let ws, active, chats = {}, contacts = [], pollInterval, screenWidth = window.innerWidth;
 let deviceMode = 'desktop'; // 'desktop', 'tablet', 'phone', 'keitai'
+let messageState = {}; // Track pagination state per contact: { phone: { total, offset, limit, loading } }
+const MESSAGES_PER_LOAD = 50;
 
 function detectScreenSize() {
     screenWidth = window.innerWidth;
@@ -943,6 +1005,11 @@ function selectContact(p) {
     document.getElementById('chatHeader').textContent = '📱 ' + p;
     clearInterval(pollInterval);
     
+    // Initialize pagination state for this contact
+    if (!messageState[p]) {
+        messageState[p] = { total: 0, offset: 0, loading: false };
+    }
+    
     applyDeviceLayout();
     renderContacts();
     
@@ -955,15 +1022,25 @@ function selectContact(p) {
 function loadChat(phone) {
     console.log('Loading chat for:', phone);
     updateStatus('⏳ Loading...');
-    return fetch('http://' + window.location.hostname + ':8080/api/chat/' + encodeURIComponent(phone))
+    
+    // Load last MESSAGES_PER_LOAD messages
+    return fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(phone) + '?offset=0&limit=' + MESSAGES_PER_LOAD)
         .then(r => {
             console.log('Response status:', r.status);
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.json();
         })
         .then(data => {
-            console.log('Loaded', data.length, 'messages');
-            chats[phone] = data;
+            console.log('Loaded', data.messages.length, 'messages (total:', data.total + ')');
+            chats[phone] = data.messages;
+            
+            // Update pagination state
+            messageState[phone] = {
+                total: data.total,
+                offset: MESSAGES_PER_LOAD,
+                loading: false
+            };
+            
             localStorage.setItem('anms_chats', JSON.stringify(chats));
             updateStatus('✓ Ready');
             return data;
@@ -971,6 +1048,35 @@ function loadChat(phone) {
         .catch(e => {
             console.error('Load error:', e);
             updateStatus('✗ Error loading');
+        });
+}
+
+function loadOlderMessages() {
+    if (!active) return;
+    const state = messageState[active];
+    if (!state || state.loading || state.offset >= state.total) return;
+    
+    state.loading = true;
+    const btn = document.getElementById('loadOlderBtn');
+    if (btn) btn.disabled = true;
+    
+    console.log('Loading older messages: offset=' + state.offset);
+    
+    fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(active) + '?offset=' + state.offset + '&limit=' + MESSAGES_PER_LOAD)
+        .then(r => r.json())
+        .then(data => {
+            console.log('Loaded', data.messages.length, 'older messages');
+            // Prepend older messages to the beginning
+            chats[active] = data.messages.concat(chats[active]);
+            state.offset += MESSAGES_PER_LOAD;
+            state.loading = false;
+            localStorage.setItem('anms_chats', JSON.stringify(chats));
+            renderMsgs();
+        })
+        .catch(e => {
+            console.error('Error loading older messages:', e);
+            state.loading = false;
+            if (btn) btn.disabled = false;
         });
 }
 
@@ -1035,7 +1141,15 @@ function renderMsgs() {
         return;
     }
     
-    const html = msgs.map(m => {
+    const state = messageState[active] || { total: msgs.length, offset: 0 };
+    let html = '';
+    
+    // Show "Load older" button if there are more messages
+    if (state.offset < state.total) {
+        html += '<button id="loadOlderBtn" class="load-older-btn" onclick="loadOlderMessages()">↑ Load older messages</button>';
+    }
+    
+    html += msgs.map(m => {
         const dirClass = m.dir === 'in' ? 'in' : 'out';
         return '<div class="message-group ' + dirClass + '"><div><div class="message-bubble">' + escapeHtml(m.body) + '</div><div class="message-time">' + m.time + '</div></div></div>';
     }).join('');
