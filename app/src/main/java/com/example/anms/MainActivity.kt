@@ -10,12 +10,14 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.anms.databinding.ActivityMainBinding
+import com.example.anms.network.HttpServer
 import com.example.anms.network.WebSocketServer
 import com.example.anms.sms.SmsManager
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var webSocketServer: WebSocketServer
+    private lateinit var httpServer: HttpServer
     private lateinit var smsManager: SmsManager
     private lateinit var messageAdapter: MessageAdapter
 
@@ -136,13 +138,21 @@ class MainActivity : AppCompatActivity() {
         }
 
         webSocketServer.start()
-        binding.serverStatusTextView.text = getString(R.string.server_running)
+        
+        // Start HTTP server to serve web client
+        httpServer = HttpServer(this, 8080)
+        httpServer.start()
+        
+        binding.serverStatusTextView.text = getString(R.string.server_running) + "\nHTTP: 8080 | WS: 8765"
     }
 
     override fun onDestroy() {
         super.onDestroy()
         if (::webSocketServer.isInitialized) {
-            webSocketServer.stop()
+            webSocketServer.stopServer()
+        }
+        if (::httpServer.isInitialized) {
+            httpServer.stop()
         }
     }
 }
