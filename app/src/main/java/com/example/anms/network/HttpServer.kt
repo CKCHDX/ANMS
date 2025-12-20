@@ -875,7 +875,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
 <script>
 let ws, active, chats = {}, contacts = [], pollInterval, screenWidth = window.innerWidth;
 let deviceMode = 'desktop'; // 'desktop', 'tablet', 'phone', 'keitai'
-let messageState = {}; // Track pagination state per contact: { phone: { total, offset, limit, loading, count } }
+let messageState = {}; // Track pagination state per contact: { phone: { total, offset, loading, lastSeenCount } }
 const MESSAGES_PER_LOAD = 8;
 
 function detectScreenSize() {
@@ -951,9 +951,7 @@ function connectWS() {
                 const [_, phone, ...msgParts] = e.data.split('|');
                 const text = msgParts.join('|');
                 console.log('New SMS from:', phone, text);
-                loadChat(phone).then(() => {
-                    if (active === phone) appendNewMessages();
-                });
+                pollChat(phone);
             }
         };
         ws.onclose = () => { updateStatus('⚠ Reconnecting...'); setTimeout(connectWS, 3000); };
@@ -985,7 +983,7 @@ function selectContact(p) {
     
     // Initialize pagination state for this contact
     if (!messageState[p]) {
-        messageState[p] = { total: 0, offset: 0, loading: false, count: 0 };
+        messageState[p] = { total: 0, offset: 0, loading: false, lastSeenCount: 0 };
     }
     
     applyDeviceLayout();
@@ -998,10 +996,10 @@ function selectContact(p) {
 }
 
 function loadChat(phone) {
-    console.log('Loading chat for:', phone);
+    console.log('Loading latest messages for:', phone);
     updateStatus('⏳ Loading...');
     
-    // Load last MESSAGES_PER_LOAD messages from the end
+    // Always fetch the LATEST messages (offset=0)
     return fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(phone) + '?offset=0&limit=' + MESSAGES_PER_LOAD)
         .then(r => {
             console.log('Response status:', r.status);
@@ -1010,14 +1008,15 @@ function loadChat(phone) {
         })
         .then(data => {
             console.log('Loaded', data.messages.length, 'messages (total:', data.total + ')');
+            // Store the new messages
             chats[phone] = data.messages;
             
-            // Update pagination state
+            // Initialize state
             messageState[phone] = {
                 total: data.total,
                 offset: MESSAGES_PER_LOAD,
                 loading: false,
-                count: data.messages.length
+                lastSeenCount: data.messages.length  // Track how many we've displayed
             };
             
             localStorage.setItem('anms_chats', JSON.stringify(chats));
@@ -1030,6 +1029,43 @@ function loadChat(phone) {
         });
 }
 
+function pollChat(phone) {
+    // Poll for new messages
+    console.log('Polling for:', phone);
+    
+    fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(phone) + '?offset=0&limit=' + MESSAGES_PER_LOAD)
+        .then(r => {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        })
+        .then(data => {
+            console.log('Poll: Got', data.messages.length, 'messages (total:', data.total + ')');
+            
+            const state = messageState[phone];
+            if (!state) return;
+            
+            // Check if there are NEW messages
+            const oldMessages = chats[phone] || [];
+            const newMessages = data.messages;
+            
+            console.log('Old count:', oldMessages.length, 'New count:', newMessages.length);
+            
+            // Only update if total count changed
+            if (newMessages.length > oldMessages.length) {
+                console.log('New messages detected!');
+                chats[phone] = newMessages;
+                state.total = data.total;
+                localStorage.setItem('anms_chats', JSON.stringify(chats));
+                
+                // If this is the active chat, append new messages
+                if (phone === active) {
+                    appendNewMessages();
+                }
+            }
+        })
+        .catch(e => console.error('Poll error:', e));
+}
+
 function appendNewMessages() {
     // Only append NEW messages, don't rebuild entire DOM
     if (!active) return;
@@ -1037,13 +1073,17 @@ function appendNewMessages() {
     const state = messageState[active];
     const msgs = chats[active] || [];
     const newCount = msgs.length;
-    const prevCount = state.count || 0;
+    const prevCount = state.lastSeenCount || 0;
+    
+    console.log('appendNewMessages: prevCount=' + prevCount + ', newCount=' + newCount);
     
     if (newCount <= prevCount) return; // No new messages
     
     // Add only new messages
     const area = document.getElementById('messages');
     const newMessages = msgs.slice(prevCount);
+    
+    console.log('Appending', newMessages.length, 'new messages');
     
     const html = newMessages.map(m => {
         const dirClass = m.dir === 'in' ? 'in' : 'out';
@@ -1058,7 +1098,7 @@ function appendNewMessages() {
     }
     
     // Update count
-    state.count = newCount;
+    state.lastSeenCount = newCount;
     
     // Auto-scroll only if user is at bottom
     if (isScrolledToBottom()) {
@@ -1085,7 +1125,7 @@ function loadOlderMessages() {
             chats[active] = data.messages.concat(chats[active]);
             state.offset += MESSAGES_PER_LOAD;
             state.loading = false;
-            state.count = chats[active].length;
+            state.lastSeenCount = chats[active].length;
             localStorage.setItem('anms_chats', JSON.stringify(chats));
             renderMsgs();
         })
@@ -1106,9 +1146,7 @@ function startPolling() {
     console.log('Started polling for:', active);
     pollInterval = setInterval(() => {
         if (active) {
-            loadChat(active).then(() => {
-                appendNewMessages();
-            }).catch(e => console.error('Poll error:', e));
+            pollChat(active);
         }
     }, 1000);
 }
@@ -1133,7 +1171,7 @@ function send() {
         document.getElementById('sendBtn').disabled = false;
         if (data.success) {
             updateStatus('✓ Sent');
-            setTimeout(() => loadChat(active).then(() => appendNewMessages()), 1000);
+            setTimeout(() => pollChat(active), 1000);
         } else {
             updateStatus('✗ Send failed: ' + data.message);
         }
@@ -1162,7 +1200,7 @@ function renderMsgs() {
         return;
     }
     
-    const state = messageState[active] || { total: msgs.length, offset: 0, count: 0 };
+    const state = messageState[active] || { total: msgs.length, offset: 0, lastSeenCount: 0 };
     let html = '';
     
     // Show "Load older" button if there are more messages
@@ -1177,7 +1215,7 @@ function renderMsgs() {
     
     const area = document.getElementById('messages');
     area.innerHTML = html;
-    state.count = msgs.length;
+    state.lastSeenCount = msgs.length;
     area.scrollTop = area.scrollHeight;
 }
 
