@@ -2,34 +2,89 @@ package com.example.anms.network
 
 import android.content.Context
 import android.util.Log
-import fi.iki.elonen.NanoHTTPD
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.PrintWriter
+import java.net.ServerSocket
 import kotlin.concurrent.thread
 
-class HttpServer(context: Context, port: Int = 8080) : NanoHTTPD(port) {
+class HttpServer(context: Context, private val port: Int = 8080) {
     private val tag = "ANMS_Http"
+    private var serverSocket: ServerSocket? = null
+    private var isRunning = false
 
-    init {
-        start()
-        Log.d(tag, "HTTP Server started on port $port")
-    }
+    fun start() {
+        thread {
+            try {
+                serverSocket = ServerSocket(port)
+                isRunning = true
+                Log.d(tag, "HTTP Server started on port $port")
 
-    override fun serve(session: IHTTPSession?): Response {
-        return try {
-            when (session?.uri) {
-                "/", "/index.html" -> {
-                    val html = getIndexHtml()
-                    newFixedLengthResponse(html).apply {
-                        addHeader("Content-Type", "text/html; charset=utf-8")
+                while (isRunning) {
+                    val clientSocket = serverSocket?.accept()
+                    if (clientSocket != null) {
+                        thread {
+                            handleClient(clientSocket)
+                        }
                     }
                 }
-                else -> {
-                    newFixedLengthResponse(Response.Status.NOT_FOUND, "text/html", "<html><body><h1>404 Not Found</h1></body></html>")
+            } catch (e: Exception) {
+                if (isRunning) {
+                    Log.e(tag, "Error in HTTP server", e)
                 }
             }
-        } catch (e: Exception) {
-            Log.e(tag, "Error handling request", e)
-            newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/html", "<html><body><h1>500 Server Error</h1></body></html>")
         }
+    }
+
+    private fun handleClient(clientSocket: java.net.Socket) {
+        try {
+            val reader = BufferedReader(InputStreamReader(clientSocket.inputStream))
+            val writer = PrintWriter(clientSocket.outputStream, true)
+
+            val requestLine = reader.readLine() ?: return
+            val parts = requestLine.split(" ")
+            val method = parts.getOrNull(0) ?: "GET"
+            val path = parts.getOrNull(1) ?: "/"
+
+            Log.d(tag, "$method $path")
+
+            val response = when {
+                path == "/" || path == "/index.html" -> {
+                    sendHtmlResponse(getIndexHtml())
+                }
+                else -> sendNotFound()
+            }
+
+            writer.print(response)
+            writer.flush()
+            clientSocket.close()
+        } catch (e: Exception) {
+            Log.e(tag, "Error handling client", e)
+            try {
+                clientSocket.close()
+            } catch (e: Exception) {
+                // Ignore
+            }
+        }
+    }
+
+    private fun sendHtmlResponse(html: String): String {
+        return """HTTP/1.1 200 OK
+Content-Type: text/html; charset=utf-8
+Content-Length: ${html.toByteArray().size}
+Connection: close
+
+$html"""
+    }
+
+    private fun sendNotFound(): String {
+        val body = "<html><body><h1>404 Not Found</h1></body></html>"
+        return """HTTP/1.1 404 Not Found
+Content-Type: text/html
+Content-Length: ${body.toByteArray().size}
+Connection: close
+
+$body"""
     }
 
     private fun getIndexHtml(): String {
@@ -198,7 +253,8 @@ class HttpServer(context: Context, port: Int = 8080) : NanoHTTPD(port) {
     fun stopServer() {
         thread {
             try {
-                stop()
+                isRunning = false
+                serverSocket?.close()
                 Log.d(tag, "HTTP server stopped")
             } catch (e: Exception) {
                 Log.e(tag, "Error stopping server", e)

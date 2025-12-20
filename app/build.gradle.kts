@@ -53,9 +53,6 @@ dependencies {
     // WebSocket
     implementation("org.java-websocket:Java-WebSocket:1.5.4")
     
-    // HTTP Server (lightweight)
-    implementation("org.nanohttpd:nanohttpd:2.3.1")
-    
     // Testing
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
