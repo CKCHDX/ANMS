@@ -877,7 +877,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
 <script>
 let ws, active, chats = {}, contacts = [], pollInterval, screenWidth = window.innerWidth;
 let deviceMode = 'desktop'; // 'desktop', 'tablet', 'phone', 'keitai'
-let messageState = {}; // Track pagination state per contact: { phone: { total, offset, loading, lastSeenCount, lastTotal } }
+let messageState = {}; // Track pagination state per contact: { phone: { total, offset, loading, lastTotal } }
 const MESSAGES_PER_LOAD = 8;
 
 function detectScreenSize() {
@@ -985,7 +985,7 @@ function selectContact(p) {
     
     // Initialize pagination state for this contact
     if (!messageState[p]) {
-        messageState[p] = { total: 0, offset: 0, loading: false, lastSeenCount: 0, lastTotal: 0 };
+        messageState[p] = { total: 0, offset: 0, loading: false, lastTotal: 0 };
     }
     
     applyDeviceLayout();
@@ -1013,12 +1013,11 @@ function loadChat(phone) {
             // Store the new messages - FRESH load for this phone
             chats[phone] = data.messages;
             
-            // Initialize state with FRESH data - mark all messages as seen
+            // Initialize state with FRESH data
             messageState[phone] = {
                 total: data.total,
                 offset: MESSAGES_PER_LOAD,
                 loading: false,
-                lastSeenCount: data.messages.length,
                 lastTotal: data.total
             };
             
@@ -1033,8 +1032,8 @@ function loadChat(phone) {
 }
 
 function pollChat(phone) {
-    // Poll for NEW messages only
-    console.log('Polling for:', phone);
+    // Poll for NEW messages - same principle as initial load
+    console.log('Polling for:', phone, 'lastTotal was:', messageState[phone]?.lastTotal);
     
     fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(phone) + '?offset=0&limit=' + MESSAGES_PER_LOAD)
         .then(r => {
@@ -1042,88 +1041,37 @@ function pollChat(phone) {
             return r.json();
         })
         .then(data => {
-            console.log('Poll: Got', data.messages.length, 'messages (total:', data.total + ')');
+            console.log('Poll response: Got', data.messages.length, 'messages (total:', data.total + ')');
             
             const state = messageState[phone];
             if (!state) {
-                console.log('No state found for', phone);
+                console.log('No state for phone', phone);
                 return;
             }
             
-            console.log('State before: lastTotal=' + state.lastTotal + ', lastSeenCount=' + state.lastSeenCount);
-            
             // Only update if TOTAL changed (new messages in the conversation)
             if (data.total > state.lastTotal) {
-                console.log('Total changed from', state.lastTotal, 'to', data.total);
-                // New messages arrived
-                const oldMessages = chats[phone] || [];
-                const newMessages = data.messages;
-                
-                console.log('Old message count:', oldMessages.length, 'New message count:', newMessages.length);
-                
-                // Replace the chats with fresh data from server
-                chats[phone] = newMessages;
+                console.log('New messages detected! Total went from', state.lastTotal, 'to', data.total);
+                // New messages arrived - use same principle as loadChat: fetch fresh data and rebuild
+                chats[phone] = data.messages;
                 state.lastTotal = data.total;
                 state.total = data.total;
                 
                 localStorage.setItem('anms_chats', JSON.stringify(chats));
                 
-                // If this is the active chat, append new messages
+                // If this is the active chat, rebuild the view (just like loadChat)
                 if (phone === active) {
-                    appendNewMessages();
+                    renderMsgs();
+                    // Auto-scroll to bottom to show new messages
+                    const area = document.getElementById('messages');
+                    area.scrollTop = area.scrollHeight;
                 }
-            } else {
-                console.log('No new messages (total unchanged)');
+                
+                // Update contact count
+                renderContacts();
             }
         })
         .catch(e => console.error('Poll error:', e));
-}
-
-function appendNewMessages() {
-    // Only append NEW messages without rebuilding entire DOM
-    if (!active) return;
-    
-    const state = messageState[active];
-    if (!state) return;
-    
-    const msgs = chats[active] || [];
-    const newCount = msgs.length;
-    const prevCount = state.lastSeenCount || 0;
-    
-    console.log('appendNewMessages: prevCount=' + prevCount + ', newCount=' + newCount);
-    
-    if (newCount <= prevCount) {
-        console.log('No new messages to append');
-        return; // No new messages
-    }
-    
-    // Add only new messages
-    const area = document.getElementById('messages');
-    const newMessages = msgs.slice(prevCount);
-    
-    console.log('Appending', newMessages.length, 'new messages');
-    
-    const html = newMessages.map(m => {
-        const dirClass = m.dir === 'in' ? 'in' : 'out';
-        return '<div class="message-group ' + dirClass + '"><div><div class="message-bubble">' + escapeHtml(m.body) + '</div><div class="message-time">' + m.time + '</div></div></div>';
-    }).join('');
-    
-    // Append to DOM instead of replacing
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = html;
-    while (tempDiv.firstChild) {
-        area.appendChild(tempDiv.firstChild);
-    }
-    
-    // Update count
-    state.lastSeenCount = newCount;
-    
-    console.log('Updated lastSeenCount to:', newCount);
-    
-    // Auto-scroll only if user is at bottom
-    if (isScrolledToBottom()) {
-        area.scrollTop = area.scrollHeight;
-    }
 }
 
 function loadOlderMessages() {
@@ -1145,7 +1093,6 @@ function loadOlderMessages() {
             chats[active] = data.messages.concat(chats[active]);
             state.offset += MESSAGES_PER_LOAD;
             state.loading = false;
-            state.lastSeenCount = chats[active].length;
             localStorage.setItem('anms_chats', JSON.stringify(chats));
             renderMsgs();
         })
@@ -1158,7 +1105,6 @@ function loadOlderMessages() {
 
 function isScrolledToBottom() {
     const area = document.getElementById('messages');
-    // Check if user is within 50px of the bottom
     return area.scrollHeight - area.scrollTop - area.clientHeight < 50;
 }
 
@@ -1220,14 +1166,14 @@ window.selectContactPhone = function(idx) {
 }
 
 function renderMsgs() {
-    // Full rebuild (only on initial load or when loading older messages)
+    // Full rebuild - same as when user clicks to open chat
     const msgs = chats[active] || [];
     if (!msgs.length) {
         document.getElementById('messages').innerHTML = '<div class="empty-state">No messages yet</div>';
         return;
     }
     
-    const state = messageState[active] || { total: msgs.length, offset: 0, lastSeenCount: 0 };
+    const state = messageState[active] || { total: msgs.length, offset: 0 };
     let html = '';
     
     // Show "Load older" button if there are more messages
@@ -1242,7 +1188,6 @@ function renderMsgs() {
     
     const area = document.getElementById('messages');
     area.innerHTML = html;
-    state.lastSeenCount = msgs.length;
     area.scrollTop = area.scrollHeight;
 }
 
