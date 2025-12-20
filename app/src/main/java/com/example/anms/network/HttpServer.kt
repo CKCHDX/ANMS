@@ -65,6 +65,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
 
             val response = when {
                 path == "/" -> sendHtmlResponse(getHtml())
+                path == "/api/debug" -> handleDebug()
                 path.startsWith("/api/chat/") -> {
                     val phone = URLDecoder.decode(path.substring(10), "UTF-8")
                     handleGetChat(phone)
@@ -90,11 +91,38 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             } catch (e: Exception) {}
         }
     }
+    
+    private fun handleDebug(): String {
+        return try {
+            Log.d(tag, "=== DEBUG INFO ===")
+            val allConvs = smsDb.getAllConversations(999)
+            Log.d(tag, "Total conversations: ${allConvs.size}")
+            
+            val debug = mutableMapOf<String, Any>()
+            debug["total_conversations"] = allConvs.size
+            debug["conversations"] = allConvs.mapKeys { it.key }.mapValues { (_, msgs) -> msgs.size }
+            
+            val json = """
+            {
+                "total_conversations": ${allConvs.size},
+                "conversations": ${allConvs.mapValues { it.value.size }}
+            }
+            """.trimIndent()
+            
+            val contentLength = json.toByteArray().size
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: $contentLength\r\nConnection: close\r\n\r\n$json"
+        } catch (e: Exception) {
+            Log.e(tag, "Debug error: ${e.message}", e)
+            jsonResponse(false, "Debug error: ${e.message}")
+        }
+    }
 
     private fun handleGetChat(phone: String): String {
         return try {
             Log.d(tag, "Loading chat for: $phone")
-            val messages = smsDb.getConversation(phone, 100)
+            val messages = smsDb.getConversation(phone, 500)
+            
+            Log.d(tag, "Found ${messages.size} messages for $phone")
             
             val json = messages.joinToString(",") { msg ->
                 val dir = if (msg.type == 1) "in" else "out"
@@ -385,6 +413,15 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             font-weight: 500;
         }
         
+        .debug-link {
+            padding: 8px 16px;
+            color: #667eea;
+            cursor: pointer;
+            font-size: 12px;
+            text-align: center;
+            border-top: 1px solid #ddd;
+        }
+        
         @media (max-width: 768px) {
             body { flex-direction: column; }
             .sidebar { width: 100%; height: 35%; border-right: none; border-bottom: 1px solid #ddd; }
@@ -408,6 +445,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             <button onclick="addContact()">Add</button>
         </div>
         <div class="contacts-list" id="contacts"></div>
+        <div class="debug-link" onclick="checkDebug()">Debug Info</div>
     </div>
     
     <div class="chat-section">
@@ -430,6 +468,15 @@ function init() {
     contacts = saved ? JSON.parse(saved) : [];
     chats = savedChats ? JSON.parse(savedChats) : {};
     renderContacts();
+}
+
+function checkDebug() {
+    fetch('http://' + window.location.hostname + ':8080/api/debug')
+        .then(r => r.json())
+        .then(data => {
+            alert('DEBUG:\n' + JSON.stringify(data, null, 2));
+        })
+        .catch(e => alert('Error: ' + e));
 }
 
 function addContact() {
@@ -522,7 +569,7 @@ function renderContacts() {
 function renderMsgs() {
     const msgs = chats[active] || [];
     if (!msgs.length) {
-        document.getElementById('messages').innerHTML = '<div class="empty-message">📭 No messages</div>';
+        document.getElementById('messages').innerHTML = '<div class="empty-message">📭 No messages yet</div>';
         return;
     }
     const html = msgs.map(m => {
