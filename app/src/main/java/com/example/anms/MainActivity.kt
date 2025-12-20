@@ -3,18 +3,16 @@ package com.example.anms
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
-import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.view.View
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
-import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.anms.network.HttpServer
 import com.example.anms.network.WebSocketServer
 import kotlin.concurrent.thread
@@ -30,7 +28,6 @@ class MainActivity : AppCompatActivity() {
     private var messageCount = 0
     private var clientCount = 0
     
-    // UI Elements
     private lateinit var statusDot: View
     private lateinit var statusText: TextView
     private lateinit var clientCountText: TextView
@@ -77,24 +74,20 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun initViews() {
-        // Status
         statusDot = findViewById(R.id.statusDot)
         statusText = findViewById(R.id.statusText)
         clientCountText = findViewById(R.id.clientCountText)
         messageCountText = findViewById(R.id.messageCountText)
         uptimeText = findViewById(R.id.uptimeText)
         
-        // Control Buttons
         startBtn = findViewById(R.id.startServerButton)
         stopBtn = findViewById(R.id.stopServerButton)
         restartBtn = findViewById(R.id.restartServerButton)
         
-        // Tab Buttons
         messagesTabBtn = findViewById(R.id.messagesTabButton)
         logsTabBtn = findViewById(R.id.logsTabButton)
         smsTabBtn = findViewById(R.id.smsTabButton)
         
-        // Tabs
         messagesTab = findViewById(R.id.messagesTab)
         logsTab = findViewById(R.id.logsTab)
         smsTab = findViewById(R.id.smsTab)
@@ -179,17 +172,14 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun switchTab(tabIndex: Int) {
-        // Hide all tabs
         messagesTab.visibility = View.GONE
         logsTab.visibility = View.GONE
         smsTab.visibility = View.GONE
         
-        // Reset button colors to gray
         messagesTabBtn.setBackgroundColor(android.graphics.Color.LTGRAY)
         logsTabBtn.setBackgroundColor(android.graphics.Color.LTGRAY)
         smsTabBtn.setBackgroundColor(android.graphics.Color.LTGRAY)
         
-        // Show selected tab and highlight button
         when (tabIndex) {
             0 -> {
                 messagesTab.visibility = View.VISIBLE
@@ -212,19 +202,25 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun updateStatsUI() {
-        clientCountText.text = clientCount.toString()
-        messageCountText.text = messageCount.toString()
+        runOnUiThread {
+            clientCountText.text = clientCount.toString()
+            messageCountText.text = messageCount.toString()
+        }
     }
     
     private fun startUptimeTimer() {
         thread {
             while (true) {
-                Thread.sleep(1000)
-                if (isServersRunning) {
-                    val elapsed = (System.currentTimeMillis() - startTime) / 1000
-                    runOnUiThread {
-                        uptimeText.text = formatUptime(elapsed)
+                try {
+                    Thread.sleep(1000)
+                    if (isServersRunning) {
+                        val elapsed = (System.currentTimeMillis() - startTime) / 1000
+                        runOnUiThread {
+                            uptimeText.text = formatUptime(elapsed)
+                        }
                     }
+                } catch (e: Exception) {
+                    Log.e(tag, "Uptime timer error", e)
                 }
             }
         }
