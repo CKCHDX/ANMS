@@ -2,78 +2,89 @@ package com.example.anms.network
 
 import android.content.Context
 import android.util.Log
-import com.example.anms.Message
-import org.java_websocket.WebSocket
-import org.java_websocket.handshake.ClientHandshake
-import org.java_websocket.server.WebSocketServer
-import java.net.InetSocketAddress
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.PrintWriter
+import java.net.ServerSocket
 import kotlin.concurrent.thread
 
 class WebSocketServer(
     context: Context,
-    port: Int,
-    private val onMessageReceived: (Message) -> Unit
-) : WebSocketServer(InetSocketAddress(port)) {
+    private val port: Int = 8765,
+    private val onMessageReceived: (String) -> Unit = {}
+) {
+    private val tag = "ANMS_WS"
+    private var serverSocket: ServerSocket? = null
+    private var isRunning = false
+    private val clients = mutableListOf<PrintWriter>()
 
-    private val connections = mutableSetOf<WebSocket>()
-    private val tag = "ANMS_WebSocket"
-
-    override fun onOpen(conn: WebSocket, handshake: ClientHandshake) {
-        connections.add(conn)
-        Log.d(tag, "Client connected: ${conn.remoteSocketAddress}")
-    }
-
-    override fun onClose(conn: WebSocket, code: Int, reason: String, remote: Boolean) {
-        connections.remove(conn)
-        Log.d(tag, "Client disconnected: ${conn.remoteSocketAddress}")
-    }
-
-    override fun onMessage(conn: WebSocket, message: String) {
-        try {
-            val parts = message.split("|", limit = 2)
-            if (parts.size == 2) {
-                val phoneNumber = parts[0]
-                val messageBody = parts[1]
-
-                onMessageReceived(
-                    Message(
-                        phoneNumber = phoneNumber,
-                        content = messageBody,
-                        timestamp = System.currentTimeMillis(),
-                        isOutgoing = true
-                    )
-                )
-
-                conn.send("OK")
-            }
-        } catch (e: Exception) {
-            Log.e(tag, "Error processing message: $message", e)
+    fun start() {
+        thread {
             try {
-                conn.send("ERROR")
+                serverSocket = ServerSocket(port)
+                isRunning = true
+                Log.d(tag, "WebSocket Server started on port $port")
+
+                while (isRunning) {
+                    val clientSocket = serverSocket?.accept()
+                    if (clientSocket != null) {
+                        thread {
+                            handleWebSocketClient(clientSocket)
+                        }
+                    }
+                }
             } catch (e: Exception) {
-                Log.e(tag, "Error sending error response", e)
+                if (isRunning) {
+                    Log.e(tag, "Error in WebSocket server", e)
+                }
             }
         }
     }
 
-    override fun onError(conn: WebSocket?, ex: Exception) {
-        Log.e(tag, "WebSocket error", ex)
-    }
+    private fun handleWebSocketClient(clientSocket: java.net.Socket) {
+        try {
+            val reader = BufferedReader(InputStreamReader(clientSocket.inputStream))
+            val writer = PrintWriter(clientSocket.outputStream, true)
+            
+            synchronized(clients) {
+                clients.add(writer)
+            }
+            Log.d(tag, "Client connected. Total clients: ${clients.size}")
 
-    override fun onStart() {
-        Log.d(tag, "WebSocket server started on port ${this.port}")
-    }
-
-    fun broadcastMessage(message: Message) {
-        val payload = "${message.phoneNumber}|${message.content}|${message.timestamp}|${message.isOutgoing}"
-        val iterator = connections.iterator()
-        while (iterator.hasNext()) {
-            val conn = iterator.next()
+            // Read and broadcast messages
+            var line: String?
+            while (reader.readLine().also { line = it } != null && isRunning) {
+                if (line != null) {
+                    Log.d(tag, "Message: $line")
+                    onMessageReceived(line!!)
+                    // Broadcast to other clients
+                    broadcastMessage(line!!)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error handling WebSocket client", e)
+        } finally {
             try {
-                conn.send(payload)
+                clientSocket.close()
+                synchronized(clients) {
+                    clients.removeIf { it == null }
+                }
+                Log.d(tag, "Client disconnected. Remaining clients: ${clients.size}")
             } catch (e: Exception) {
-                Log.e(tag, "Error broadcasting to client", e)
-                iterator.remove()
+                // Ignore
+            }
+        }
+    }
+
+    private fun broadcastMessage(message: String) {
+        synchronized(clients) {
+            clients.forEach { client ->
+                try {
+                    client.println(message)
+                    client.flush()
+                } catch (e: Exception) {
+                    Log.e(tag, "Error broadcasting message", e)
+                }
             }
         }
     }
@@ -81,11 +92,21 @@ class WebSocketServer(
     fun stopServer() {
         thread {
             try {
-                super.stop()
+                isRunning = false
+                synchronized(clients) {
+                    clients.clear()
+                }
+                serverSocket?.close()
                 Log.d(tag, "WebSocket server stopped")
             } catch (e: Exception) {
-                Log.e(tag, "Error stopping server", e)
+                Log.e(tag, "Error stopping WebSocket server", e)
             }
+        }
+    }
+
+    fun getClientCount(): Int {
+        synchronized(clients) {
+            return clients.size
         }
     }
 }
