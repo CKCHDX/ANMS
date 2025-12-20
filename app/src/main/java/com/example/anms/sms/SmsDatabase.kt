@@ -8,7 +8,7 @@ import android.util.Log
 class SmsDatabase(private val context: Context) {
     private val tag = "ANMS_SmsDb"
     
-    data class Message(
+    data class SmsMessage(
         val id: String,
         val phone: String,
         val body: String,
@@ -16,9 +16,9 @@ class SmsDatabase(private val context: Context) {
         val type: Int // 1=received, 2=sent
     )
     
-    fun getConversation(phoneNumber: String, limit: Int = 100): List<Message> {
+    fun getConversation(phoneNumber: String, limit: Int = 100): List<SmsMessage> {
         return try {
-            val messages = mutableListOf<Message>()
+            val messages = mutableListOf<SmsMessage>()
             
             // Content URIs for SMS
             val smsUri = Uri.parse("content://sms/")
@@ -44,8 +44,8 @@ class SmsDatabase(private val context: Context) {
         }
     }
     
-    private fun querySms(uri: Uri, phoneNumber: String, type: Int, limit: Int): List<Message> {
-        val messages = mutableListOf<Message>()
+    private fun querySms(uri: Uri, phoneNumber: String, type: Int, limit: Int): List<SmsMessage> {
+        val messages = mutableListOf<SmsMessage>()
         
         try {
             val projection = arrayOf("_id", "address", "body", "date", "type")
@@ -76,7 +76,7 @@ class SmsDatabase(private val context: Context) {
                         val body = it.getString(bodyCol) ?: ""
                         val timestamp = it.getLong(dateCol)
                         
-                        messages.add(Message(
+                        messages.add(SmsMessage(
                             id = id,
                             phone = address,
                             body = body,
@@ -95,9 +95,9 @@ class SmsDatabase(private val context: Context) {
         return messages
     }
     
-    fun getAllConversations(limit: Int = 50): Map<String, List<Message>> {
+    fun getAllConversations(limit: Int = 50): Map<String, List<SmsMessage>> {
         return try {
-            val conversations = mutableMapOf<String, MutableList<Message>>()
+            val conversations = mutableMapOf<String, MutableList<SmsMessage>>()
             
             val smsUri = Uri.parse("content://sms/")
             val projection = arrayOf("_id", "address", "body", "date", "type")
@@ -128,7 +128,7 @@ class SmsDatabase(private val context: Context) {
                         if (!conversations.containsKey(address)) {
                             conversations[address] = mutableListOf()
                         }
-                        conversations[address]?.add(Message(id, address, body, timestamp, type))
+                        conversations[address]?.add(SmsMessage(id, address, body, timestamp, type))
                     } catch (e: Exception) {
                         Log.e(tag, "Error parsing SMS: ${e.message}")
                     }
