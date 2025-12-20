@@ -101,14 +101,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             val stats = smsCache.getStats()
             Log.d(tag, "Cache stats: $stats")
             
-            val json = """
-            {
-                "ready": ${stats["loaded"]},
-                "total_conversations": ${stats["total_conversations"]},
-                "total_messages": ${stats["total_messages"]},
-                "conversations": ${stats["conversations"]}
-            }
-            """.trimIndent().replace("\n", "")
+            val json = """{"status":"ready","total_conversations":${stats["total_conversations"]},"total_messages":${stats["total_messages"]}}"""
             
             val contentLength = json.toByteArray().size
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: $contentLength\r\nConnection: close\r\n\r\n$json"
@@ -125,8 +118,11 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             }
             
             Log.d(tag, "Loading chat for: $phone")
-            val messages = smsCache.getConversation(phone)
+            // Load from database on demand
+            smsCache.loadConversation(phone)
+            Thread.sleep(500) // Wait for load to complete
             
+            val messages = smsCache.getConversation(phone)
             Log.d(tag, "Found ${messages.size} messages for $phone")
             
             val json = messages.joinToString(",") { msg ->
@@ -418,15 +414,6 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             font-weight: 500;
         }
         
-        .debug-link {
-            padding: 8px 16px;
-            color: #667eea;
-            cursor: pointer;
-            font-size: 12px;
-            text-align: center;
-            border-top: 1px solid #ddd;
-        }
-        
         @media (max-width: 768px) {
             body { flex-direction: column; }
             .sidebar { width: 100%; height: 35%; border-right: none; border-bottom: 1px solid #ddd; }
@@ -450,7 +437,6 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             <button onclick="addContact()">Add</button>
         </div>
         <div class="contacts-list" id="contacts"></div>
-        <div class="debug-link" onclick="checkDebug()">\ud83d\udcca Debug</div>
     </div>
     
     <div class="chat-section">
@@ -473,27 +459,6 @@ function init() {
     contacts = saved ? JSON.parse(saved) : [];
     chats = savedChats ? JSON.parse(savedChats) : {};
     renderContacts();
-}
-
-function checkDebug() {
-    fetch('http://' + window.location.hostname + ':8080/api/debug')
-        .then(r => r.json())
-        .then(data => {
-            let msg = 'DEBUG INFO:\n\n';
-            msg += 'Cache Ready: ' + data.ready + '\n';
-            msg += 'Total Conversations: ' + data.total_conversations + '\n';
-            msg += 'Total Messages: ' + data.total_messages + '\n\n';
-            if (data.conversations && Object.keys(data.conversations).length > 0) {
-                msg += 'Conversations:\n';
-                Object.entries(data.conversations).forEach(([phone, count]) => {
-                    msg += '  ' + phone + ': ' + count + ' messages\n';
-                });
-            } else {
-                msg += 'No SMS found in cache!';
-            }
-            alert(msg);
-        })
-        .catch(e => alert('Error: ' + e));
 }
 
 function addContact() {
@@ -520,20 +485,21 @@ function selectContact(p) {
         renderMsgs();
         updateStatus('\u2713 Ready', '#4CAF50');
         startPolling();
+    }).catch(() => {
+        updateStatus('\u2717 Error loading', '#f44336');
     });
 }
 
 function loadChat(phone) {
     return fetch('http://' + window.location.hostname + ':8080/api/chat/' + encodeURIComponent(phone))
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        })
         .then(data => {
             chats[phone] = data;
             localStorage.setItem('anms_chats', JSON.stringify(chats));
             return data;
-        })
-        .catch(e => {
-            updateStatus('\u2717 Error', '#f44336');
-            console.error(e);
         });
 }
 
@@ -541,7 +507,7 @@ function startPolling() {
     if (!active) return;
     pollInterval = setInterval(() => {
         if (active) loadChat(active).then(() => renderMsgs()).catch(() => {});
-    }, 2000);
+    }, 3000);
 }
 
 function send() {
@@ -586,7 +552,7 @@ function renderContacts() {
 function renderMsgs() {
     const msgs = chats[active] || [];
     if (!msgs.length) {
-        document.getElementById('messages').innerHTML = '<div class="empty-message">\ud83d\uddd1\ufe0f No messages yet</div>';
+        document.getElementById('messages').innerHTML = '<div class="empty-message">No messages yet</div>';
         return;
     }
     const html = msgs.map(m => {
