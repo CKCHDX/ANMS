@@ -45,7 +45,6 @@ class MainActivity : AppCompatActivity() {
             setupButtons()
             requestPermissions()
             smsCache = SmsCache(this)
-            smsCache?.loadInitialSms()
             startUptimeTimer()
             startSMSService()
         } catch (e: Exception) {
