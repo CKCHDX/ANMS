@@ -17,7 +17,6 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
     private var isRunning = false
     private val smsManager = SmsManager.getDefault()
     private val smsDb = SmsDatabase(context)
-    private val MAX_MESSAGE_SIZE = 32768 // 32KB per message (increased from ~4KB)
 
     fun start() {
         thread {
@@ -99,14 +98,13 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
 
     private fun handleGetMessages(phone: String, offset: Int, limit: Int): String {
         return try {
-            Log.d(tag, "[POLL] Loading messages for: $phone (offset=$offset, limit=$limit)")
+            Log.d(tag, "Loading messages for: $phone (offset=$offset, limit=$limit)")
             val allMessages = smsDb.getConversation(phone, 500)
-            Log.d(tag, "[POLL] Got ${allMessages.size} total messages from DB")
+            Log.d(tag, "Got ${allMessages.size} total messages")
 
-            // FIXED: Always fetch the LATEST messages from the END of the list
-            // offset=0 means get the LAST 'limit' messages (most recent)
-            // offset=1 means skip the last message, get next 'limit', etc.
-            // This prevents duplicates and ensures we always get fresh data
+            // Pagination from END of conversation (most recent messages)
+            // offset=0 means get the LAST 'limit' messages
+            // offset=8 means skip last 8, get next 8, etc.
             val startIndex = maxOf(0, allMessages.size - limit - offset)
             val endIndex = allMessages.size - offset
             
@@ -116,32 +114,19 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 emptyList()
             }
 
-            Log.d(tag, "[POLL] Returning ${paginatedMessages.size} paginated messages (indices $startIndex to $endIndex)")
-
             val json = paginatedMessages.joinToString(",") { msg ->
                 val dir = if (msg.type == 1) "in" else "out"
                 val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(msg.timestamp)
-                // FIXED: Use replace with proper escaping to handle larger messages
-                val cleanBody = msg.body
-                    .replace("\\", "\\\\")  // Escape backslashes first
-                    .replace("\"", "\\\"")   // Escape quotes
-                    .replace("\n", "\\n")    // Escape newlines
-                    .replace("\r", "\\r")    // Escape carriage returns
-                    .replace("\t", "\\t")    // Escape tabs
-                
-                "{\"body\":\"$cleanBody\",\"dir\":\"$dir\",\"time\":\"$time\"}"
+                val cleanBody = msg.body.replace("\\", " ").replace("\"", "\\\"")
+                """{"body":"$cleanBody","dir":"$dir","time":"$time"}"""
             }
 
             val hasMore = (allMessages.size - offset - limit) > 0
-            val body = "{\"messages\":[$json],\"total\":${allMessages.size},\"offset\":$offset,\"limit\":$limit,\"hasMore\":$hasMore}"
+            val body = """{"messages":[$json],"total":${allMessages.size},"offset":$offset,"limit":$limit,"hasMore":$hasMore}"""
             val contentLength = body.toByteArray().size
-            
-            Log.d(tag, "[POLL] Response body size: $contentLength bytes")
-            
-            // NO-CACHE headers to ensure fresh data every time + timestamp handling
-            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: $contentLength\r\nCache-Control: no-store, no-cache, must-revalidate, max-age=0\r\nPragma: no-cache\r\nExpires: 0\r\nConnection: close\r\n\r\n$body"
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: $contentLength\r\nConnection: close\r\n\r\n$body"
         } catch (e: Exception) {
-            Log.e(tag, "[POLL] Error loading messages: ${e.message}", e)
+            Log.e(tag, "Error loading messages: ${e.message}", e)
             jsonResponse(false, "Error: ${e.message}")
         }
     }
@@ -149,7 +134,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
     private fun handleSendMessage(body: String): String {
         return try {
             val params = body.split("&").associate {
-                val kv = it.split("=", limit = 2)
+                val kv = it.split("=")
                 Pair(kv[0], URLDecoder.decode(kv.getOrNull(1) ?: "", "UTF-8"))
             }
             val phone = params["phone"] ?: return jsonResponse(false, "Missing phone")
@@ -172,14 +157,14 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
     }
 
     private fun jsonResponse(success: Boolean, message: String): String {
-        val json = "{\"success\":$success,\"message\":\"$message\"}"
+        val json = """{"success":$success,"message":"$message"}"""
         val contentLength = json.toByteArray().size
-        return "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: $contentLength\r\nCache-Control: no-store, no-cache, must-revalidate, max-age=0\r\nPragma: no-cache\r\nExpires: 0\r\nConnection: close\r\n\r\n$json"
+        return "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: $contentLength\r\nConnection: close\r\n\r\n$json"
     }
 
     private fun sendHtmlResponse(html: String): String {
         val contentLength = html.toByteArray().size
-        return "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: $contentLength\r\nCache-Control: no-store, no-cache, must-revalidate, max-age=0\r\nPragma: no-cache\r\nExpires: 0\r\nConnection: close\r\n\r\n$html"
+        return "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: $contentLength\r\nConnection: close\r\n\r\n$html"
     }
 
     private fun sendNotFound(): String {
@@ -892,7 +877,6 @@ let ws, active, chats = {}, contacts = [], pollInterval, screenWidth = window.in
 let deviceMode = 'desktop'; // 'desktop', 'tablet', 'phone', 'keitai'
 let messageState = {}; // Track pagination state per contact: { phone: { total, offset, loading, lastSeenCount } }
 const MESSAGES_PER_LOAD = 8;
-let pollCount = 0;
 
 function detectScreenSize() {
     screenWidth = window.innerWidth;
@@ -990,7 +974,7 @@ function addContact() {
 }
 
 function selectContact(p) {
-    console.log('>>> Selecting contact:', p);
+    console.log('Selecting contact:', p);
     active = p;
     document.getElementById('msg').disabled = false;
     document.getElementById('sendBtn').disabled = false;
@@ -1012,27 +996,18 @@ function selectContact(p) {
 }
 
 function loadChat(phone) {
-    console.log('[LOAD] Loading latest messages for:', phone);
+    console.log('Loading latest messages for:', phone);
     updateStatus('⏳ Loading...');
     
     // Always fetch the LATEST messages (offset=0)
-    // Add timestamp to bust cache
-    const ts = Date.now();
-    return fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(phone) + '?offset=0&limit=' + MESSAGES_PER_LOAD + '&_t=' + ts, {
-        method: 'GET',
-        headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-        }
-    })
+    return fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(phone) + '?offset=0&limit=' + MESSAGES_PER_LOAD)
         .then(r => {
-            console.log('[LOAD] Response status:', r.status);
+            console.log('Response status:', r.status);
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.json();
         })
         .then(data => {
-            console.log('[LOAD] Got', data.messages.length, 'messages (total:', data.total + ')');
+            console.log('Loaded', data.messages.length, 'messages (total:', data.total + ')');
             // Store the new messages
             chats[phone] = data.messages;
             
@@ -1049,59 +1024,46 @@ function loadChat(phone) {
             return data;
         })
         .catch(e => {
-            console.error('[LOAD] Error:', e);
+            console.error('Load error:', e);
             updateStatus('✗ Error loading');
         });
 }
 
 function pollChat(phone) {
     // Poll for new messages
-    pollCount++;
-    console.log('[POLL #' + pollCount + '] Checking for new messages from:', phone);
+    console.log('Polling for:', phone);
     
-    // Add timestamp to bust cache
-    const ts = Date.now();
-    fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(phone) + '?offset=0&limit=' + MESSAGES_PER_LOAD + '&_t=' + ts, {
-        method: 'GET',
-        headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-        }
-    })
+    fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(phone) + '?offset=0&limit=' + MESSAGES_PER_LOAD)
         .then(r => {
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.json();
         })
         .then(data => {
+            console.log('Poll: Got', data.messages.length, 'messages (total:', data.total + ')');
+            
             const state = messageState[phone];
-            if (!state) {
-                console.log('[POLL] No state for phone:', phone);
-                return;
-            }
+            if (!state) return;
             
             // Check if there are NEW messages
             const oldMessages = chats[phone] || [];
             const newMessages = data.messages;
             
-            console.log('[POLL #' + pollCount + '] old=' + oldMessages.length + ', new=' + newMessages.length + ', total=' + data.total);
+            console.log('Old count:', oldMessages.length, 'New count:', newMessages.length);
             
             // Only update if total count changed
             if (newMessages.length > oldMessages.length) {
-                console.log('[POLL] ✓ New messages detected! appending ' + (newMessages.length - oldMessages.length) + ' new');
+                console.log('New messages detected!');
                 chats[phone] = newMessages;
                 state.total = data.total;
                 localStorage.setItem('anms_chats', JSON.stringify(chats));
                 
-                // If this is the active chat, append new messages (smart append, no rebuild)
+                // If this is the active chat, append new messages
                 if (phone === active) {
                     appendNewMessages();
                 }
-            } else {
-                console.log('[POLL] No new messages');
             }
         })
-        .catch(e => console.error('[POLL] Error:', e));
+        .catch(e => console.error('Poll error:', e));
 }
 
 function appendNewMessages() {
@@ -1113,18 +1075,15 @@ function appendNewMessages() {
     const newCount = msgs.length;
     const prevCount = state.lastSeenCount || 0;
     
-    console.log('[APPEND] prevCount=' + prevCount + ', newCount=' + newCount);
+    console.log('appendNewMessages: prevCount=' + prevCount + ', newCount=' + newCount);
     
-    if (newCount <= prevCount) {
-        console.log('[APPEND] No new messages to append');
-        return; // No new messages
-    }
+    if (newCount <= prevCount) return; // No new messages
     
     // Add only new messages
     const area = document.getElementById('messages');
     const newMessages = msgs.slice(prevCount);
     
-    console.log('[APPEND] Appending', newMessages.length, 'new messages');
+    console.log('Appending', newMessages.length, 'new messages');
     
     const html = newMessages.map(m => {
         const dirClass = m.dir === 'in' ? 'in' : 'out';
@@ -1158,16 +1117,7 @@ function loadOlderMessages() {
     
     console.log('Loading older messages: offset=' + state.offset);
     
-    // Add timestamp to bust cache
-    const ts = Date.now();
-    fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(active) + '?offset=' + state.offset + '&limit=' + MESSAGES_PER_LOAD + '&_t=' + ts, {
-        method: 'GET',
-        headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-        }
-    })
+    fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(active) + '?offset=' + state.offset + '&limit=' + MESSAGES_PER_LOAD)
         .then(r => r.json())
         .then(data => {
             console.log('Loaded', data.messages.length, 'older messages');
@@ -1193,8 +1143,7 @@ function isScrolledToBottom() {
 }
 
 function startPolling() {
-    console.log('>>> Starting polling for:', active);
-    pollCount = 0;
+    console.log('Started polling for:', active);
     pollInterval = setInterval(() => {
         if (active) {
             pollChat(active);
@@ -1238,7 +1187,7 @@ function renderContacts() {
     const html = contacts.map(p => {
         const cnt = (chats[p] || []).length;
         const cls = active === p ? 'active' : '';
-        return '<div class="contact-item ' + cls + '" onclick="selectContact(\'' + p.replace(/'/g, "\\\\'") + '\'"><div class="contact-number">' + escapeHtml(p) + '</div><div class="contact-count">' + cnt + ' messages</div></div>';
+        return '<div class="contact-item ' + cls + '" onclick="selectContact(\'' + p.replace(/'/g, "\\\\'") + '\')"><div class="contact-number">' + escapeHtml(p) + '</div><div class="contact-count">' + cnt + ' messages</div></div>';
     }).join('');
     document.getElementById('contacts').innerHTML = html || '<div style="color: #666; text-align: center; padding: 20px; font-size: 12px;">No contacts yet</div>';
 }
