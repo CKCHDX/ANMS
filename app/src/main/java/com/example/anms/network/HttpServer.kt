@@ -176,10 +176,10 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
 
     private fun getHtml(): String {
         return """<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>ANMS - SMS Client</title>
     <style>
         * {
@@ -187,7 +187,9 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             padding: 0;
             box-sizing: border-box;
             -webkit-user-select: none;
+            user-select: none;
             -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
         }
         
         html, body {
@@ -198,6 +200,8 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             font-size: 15px;
             position: fixed;
+            top: 0;
+            left: 0;
             overflow: hidden;
         }
         
@@ -208,10 +212,10 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
         
         .main {
             display: flex;
+            width: 100vw;
             height: 100vh;
             gap: 0;
             flex: 1;
-            width: 100%;
         }
         
         .sidebar {
@@ -228,21 +232,29 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             font-weight: 600;
             font-size: 16px;
             color: #fff;
+            flex-shrink: 0;
         }
         
         .phone-input-group {
             display: flex;
             gap: 8px;
+            flex-shrink: 0;
         }
         
-        .phone-input-group input {
-            flex: 1;
+        .phone-input-group input,
+        .phone-input-group button {
             padding: 10px 12px;
             background: #252525;
             border: 1px solid #404040;
             border-radius: 6px;
             color: #e0e0e0;
             font-size: 14px;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        
+        .phone-input-group input {
+            flex: 1;
         }
         
         .phone-input-group input:focus {
@@ -252,20 +264,13 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
         }
         
         .phone-input-group button {
-            padding: 10px 16px;
             background: #4a9eff;
-            border: none;
-            border-radius: 6px;
             color: #fff;
             font-weight: 600;
             cursor: pointer;
             font-size: 13px;
             transition: all 0.2s;
-            -webkit-appearance: none;
-        }
-        
-        .phone-input-group button:hover {
-            background: #2e7dd9;
+            padding: 10px 16px;
         }
         
         .phone-input-group button:active {
@@ -278,6 +283,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             display: flex;
             flex-direction: column;
             gap: 6px;
+            -webkit-overflow-scrolling: touch;
         }
         
         .contact-item {
@@ -289,15 +295,11 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             transition: all 0.2s;
             font-size: 14px;
             -webkit-appearance: none;
-        }
-        
-        .contact-item:hover {
-            background: #303030;
-            border-color: #404040;
+            appearance: none;
         }
         
         .contact-item:active {
-            background: #4a9eff;
+            background: #303030;
         }
         
         .contact-item.active {
@@ -334,6 +336,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             display: flex;
             align-items: center;
             justify-content: space-between;
+            flex-shrink: 0;
         }
         
         .chat-header-back {
@@ -348,6 +351,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             font-weight: 600;
             transition: all 0.2s;
             -webkit-appearance: none;
+            appearance: none;
         }
         
         .chat-header-back:active {
@@ -361,6 +365,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             display: flex;
             flex-direction: column;
             gap: 8px;
+            -webkit-overflow-scrolling: touch;
         }
         
         .load-older-btn {
@@ -375,9 +380,10 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             transition: all 0.2s;
             margin: 8px 0;
             -webkit-appearance: none;
+            appearance: none;
         }
         
-        .load-older-btn:hover {
+        .load-older-btn:active {
             background: #303030;
         }
         
@@ -464,6 +470,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             border-top: 1px solid #333;
             display: flex;
             gap: 12px;
+            flex-shrink: 0;
         }
         
         .input-section textarea {
@@ -479,6 +486,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             max-height: 80px;
             min-height: 40px;
             -webkit-appearance: none;
+            appearance: none;
         }
         
         .input-section textarea:focus {
@@ -500,10 +508,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             transition: all 0.2s;
             align-self: flex-end;
             -webkit-appearance: none;
-        }
-        
-        .input-section button:hover {
-            background: #2e7dd9;
+            appearance: none;
         }
         
         .input-section button:active {
@@ -525,7 +530,6 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             flex-shrink: 0;
         }
         
-        /* Scrollbar styling */
         ::-webkit-scrollbar {
             width: 6px;
         }
@@ -539,383 +543,140 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             border-radius: 3px;
         }
         
-        ::-webkit-scrollbar-thumb:hover {
-            background: #505050;
-        }
-        
         /* ==================== DESKTOP (1024px+) ==================== */
         @media (max-width: 1024px) {
-            .sidebar {
-                width: 240px;
-                padding: 12px;
-            }
-            
-            .chat-header {
-                padding: 12px;
-                font-size: 14px;
-            }
-            
-            .messages-area {
-                padding: 12px;
-            }
-            
-            .message-bubble {
-                max-width: 75%;
-                font-size: 15px;
-            }
+            .sidebar { width: 240px; padding: 12px; }
+            .chat-header { padding: 12px; font-size: 14px; }
+            .messages-area { padding: 12px; }
+            .message-bubble { max-width: 75%; font-size: 15px; }
         }
         
         /* ==================== TABLET (768px - 1024px) ==================== */
         @media (max-width: 768px) {
-            .main {
-                flex-direction: column;
-            }
-            
-            .sidebar {
-                width: 100%;
-                max-height: 40%;
-                border-right: none;
-                border-bottom: 1px solid #333;
-                padding: 12px;
-            }
-            
-            .chat-container {
-                min-height: 60%;
-                flex: 1;
-            }
-            
-            .message-bubble {
-                max-width: 85%;
-                font-size: 15px;
-            }
-            
-            .input-section {
-                padding: 12px;
-                gap: 8px;
-            }
-            
-            .input-section textarea {
-                font-size: 14px;
-                min-height: 36px;
-            }
-            
-            .input-section button {
-                padding: 8px 16px;
-                font-size: 12px;
-            }
-            
-            .phone-input-group {
-                gap: 6px;
-            }
-            
-            .phone-input-group input,
-            .phone-input-group button {
-                padding: 8px 10px;
-                font-size: 13px;
-            }
+            .main { flex-direction: column; }
+            .sidebar { width: 100%; max-height: 40%; border-right: none; border-bottom: 1px solid #333; padding: 12px; }
+            .chat-container { min-height: 60%; flex: 1; }
+            .message-bubble { max-width: 85%; font-size: 15px; }
+            .input-section { padding: 12px; gap: 8px; }
+            .input-section textarea { font-size: 14px; min-height: 36px; }
+            .input-section button { padding: 8px 16px; font-size: 12px; }
+            .phone-input-group { gap: 6px; }
+            .phone-input-group input, .phone-input-group button { padding: 8px 10px; font-size: 13px; }
         }
         
-        /* ==================== PHONE (480px - 768px) ==================== */
+        /* ==================== KEITAI / MOBILE (<480px) ==================== */
         @media (max-width: 480px) {
-            .main {
-                flex-direction: column;
-                height: 100vh;
-                width: 100%;
-            }
+            html, body { font-size: 13px; }
+            .main { flex-direction: column; width: 100vw; height: 100vh; }
             
-            /* Contact selection screen (visible by default on keitai) */
             .sidebar {
                 width: 100%;
                 border: none;
-                padding: 8px;
-                gap: 6px;
-                flex: 0 1 auto;
-                display: flex;
-                flex-direction: column;
+                padding: 6px;
+                gap: 4px;
+                flex: 0 0 auto;
                 max-height: none;
             }
             
-            /* Hide sidebar when chat is active on small screens */
-            .sidebar.chat-active {
-                display: none;
-            }
+            .sidebar.chat-active { display: none; }
             
-            .sidebar-header {
-                font-size: 13px;
-                font-weight: 600;
-                padding: 2px 0;
-                flex-shrink: 0;
-            }
+            .sidebar-header { font-size: 12px; padding: 2px 0; }
             
-            /* Stack input vertically on ultra-narrow screens */
+            /* FULL WIDTH INPUT - CRITICAL FOR KEITAI */
             .phone-input-group {
-                display: flex;
                 flex-direction: column;
                 width: 100%;
                 gap: 4px;
-                flex-shrink: 0;
             }
             
             .phone-input-group input {
                 width: 100%;
+                min-height: 44px;
                 padding: 10px 8px;
                 font-size: 13px;
-                border-radius: 4px;
-                -webkit-appearance: none;
             }
             
             .phone-input-group button {
                 width: 100%;
+                min-height: 44px;
                 padding: 10px 8px;
                 font-size: 12px;
-                border-radius: 4px;
-                -webkit-appearance: none;
             }
             
             .contacts-list {
-                flex: 1 1 auto;
-                max-height: none;
+                flex: 1;
                 min-height: 100px;
                 gap: 4px;
-                padding-bottom: 8px;
                 overflow-y: auto;
             }
             
             .contact-item {
                 padding: 10px;
                 font-size: 12px;
-                border-radius: 6px;
-                border: 1px solid #333;
-                cursor: pointer;
-                transition: all 0.2s;
+                min-height: 44px;
                 flex-shrink: 0;
-                -webkit-appearance: none;
             }
             
-            .contact-item:active {
-                background: #303030;
-            }
+            .contact-number { margin-bottom: 2px; font-weight: 600; font-size: 13px; }
+            .contact-count { font-size: 11px; }
             
-            .contact-number {
-                margin-bottom: 2px;
-                font-weight: 600;
-                font-size: 13px;
-            }
-            
-            .contact-count {
-                font-size: 11px;
-                opacity: 0.7;
-            }
-            
-            /* Chat container hidden by default, shown when contact selected */
             .chat-container {
                 display: none;
                 width: 100%;
                 height: 100vh;
                 flex: none;
-                border: none;
             }
             
-            .chat-container.chat-active {
-                display: flex;
-            }
+            .chat-container.chat-active { display: flex; }
             
-            .chat-header {
-                padding: 8px;
-                font-size: 12px;
-                font-weight: 600;
-                gap: 6px;
-                flex-shrink: 0;
-            }
+            .chat-header { padding: 8px; font-size: 12px; gap: 6px; }
             
             .chat-header-back {
                 display: block !important;
                 padding: 6px 8px !important;
                 font-size: 11px;
-                flex-shrink: 0;
-                background: #4a9eff;
-                border: none;
-                color: #fff;
-                border-radius: 4px;
-                cursor: pointer;
-                font-weight: 600;
-                transition: all 0.2s;
-                -webkit-appearance: none;
-            }
-            
-            .chat-header-back:active {
-                transform: scale(0.95);
-            }
-            
-            .chat-header-title {
-                flex: 1;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-                font-size: 12px;
-            }
-            
-            /* Compact vertical message layout for keitai */
-            .messages-area {
-                padding: 6px 6px;
-                gap: 3px;
-                font-size: 12px;
-                flex-direction: column;
-                flex: 1;
-            }
-            
-            .message-group {
+                min-height: 44px;
                 display: flex;
-                flex-direction: column;
-                margin-bottom: 0px;
-                animation: fadeIn 0.3s ease-out;
-                width: fit-content;
-                max-width: 85%;
+                align-items: center;
             }
             
-            .message-group.in {
-                align-items: flex-start;
-                margin-right: auto;
-            }
-
-            .message-group.out {
-                align-items: flex-end;
-                margin-left: auto;
-            }
+            .chat-header-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
             
-            .message-bubble {
-                max-width: 100%;
-                padding: 6px 8px;
-                font-size: 12px;
-                border-radius: 5px;
-                word-break: break-word;
-                line-height: 1.2;
-            }
+            .messages-area { padding: 6px; gap: 3px; font-size: 12px; flex: 1; }
             
-            .message-group.in .message-time {
-                text-align: left;
-            }
-
-            .message-group.out .message-time {
-                text-align: right;
-            }
-
-            .message-time {
-                font-size: 10px;
-                margin-top: 2px;
-                display: block;
-                opacity: 0.8;
-            }
+            .message-group { max-width: 85%; }
+            .message-bubble { padding: 6px 8px; font-size: 12px; border-radius: 5px; line-height: 1.2; }
+            .message-time { font-size: 10px; }
             
-            .input-section {
-                padding: 6px;
-                gap: 4px;
-                flex-shrink: 0;
-            }
-
-            .input-section textarea {
-                padding: 6px;
-                font-size: 12px;
-                min-height: 28px;
-                max-height: 50px;
-                -webkit-appearance: none;
-            }
-
-            .input-section button {
-                padding: 6px 10px;
-                font-size: 11px;
-                -webkit-appearance: none;
-            }
+            .input-section { padding: 6px; gap: 4px; flex-direction: column; }
+            .input-section textarea { padding: 6px; font-size: 12px; min-height: 28px; width: 100%; }
+            .input-section button { padding: 6px 10px; font-size: 11px; width: 100%; min-height: 44px; }
             
-            .status-bar {
-                padding: 4px 6px;
-                font-size: 10px;
-                flex-shrink: 0;
-            }
-            
-            .empty-state {
-                font-size: 12px;
-            }
-        }
-        
-        /* ==================== ULTRA-SMALL (<320px) ==================== */
-        @media (max-width: 320px) {
-            .chat-header {
-                padding: 8px;
-            }
-            
-            .chat-header-back {
-                padding: 6px 8px !important;
-                font-size: 10px;
-            }
-            
-            .messages-area {
-                padding: 6px;
-            }
-            
-            .message-bubble {
-                padding: 7px 9px;
-                font-size: 12px;
-            }
-            
-            .input-section {
-                padding: 6px;
-            }
-            
-            .input-section textarea {
-                min-height: 28px;
-                font-size: 12px;
-                padding: 6px;
-            }
-            
-            .input-section button {
-                padding: 6px 10px;
-                font-size: 11px;
-            }
-            
-            .contact-item {
-                padding: 10px !important;
-            }
-            
-            .contact-number {
-                font-size: 12px !important;
-            }
-            
-            .sidebar {
-                padding: 6px !important;
-                gap: 6px !important;
-            }
-            
-            .phone-input-group input,
-            .phone-input-group button {
-                padding: 8px 6px !important;
-                font-size: 12px !important;
-            }
+            .status-bar { padding: 4px 6px; font-size: 10px; }
+            .empty-state { font-size: 12px; }
         }
     </style>
 </head>
 <body>
 <div class="main">
-    <!-- CONTACT SELECTION SCREEN (visible on keitai by default) -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">📱 Chats</div>
         <div class="phone-input-group">
-            <input type="tel" id="phone" placeholder="Phone #" maxlength="20">
-            <button onclick="addContact()">Add</button>
+            <input type="tel" id="phone" placeholder="Phone #" maxlength="20" autocomplete="tel">
+            <button type="button" onclick="addContact()">Add</button>
         </div>
         <div class="contacts-list" id="contacts"></div>
     </div>
     
-    <!-- CHAT SCREEN (hidden on keitai until contact selected) -->
     <div class="chat-container" id="chatContainer">
         <div class="chat-header">
-            <button class="chat-header-back" id="backBtn" onclick="goBack()">← Back</button>
+            <button class="chat-header-back" id="backBtn" type="button" onclick="goBack()">← Back</button>
             <div class="chat-header-title" id="chatHeader">Select a contact</div>
         </div>
         <div class="messages-area" id="messages"><div class="empty-state">👈 Select a contact to start chatting</div></div>
         <div class="input-section">
-            <textarea id="msg" placeholder="Type message..." disabled></textarea>
-            <button onclick="send()" id="sendBtn" disabled>Send</button>
+            <textarea id="msg" placeholder="Type message..." disabled autocomplete="off"></textarea>
+            <button type="button" onclick="send()" id="sendBtn" disabled>Send</button>
         </div>
         <div class="status-bar" id="status">✓ Ready</div>
     </div>
@@ -923,46 +684,53 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
 
 <script>
 let ws, active, chats = {}, contacts = [], pollInterval, screenWidth = window.innerWidth;
-let deviceMode = 'desktop'; // 'desktop', 'tablet', 'phone', 'keitai'
-let messageState = {}; // Track pagination state per contact: { phone: { total, offset, loading, lastTotal } }
+let deviceMode = 'desktop';
+let messageState = {};
 const MESSAGES_PER_LOAD = 8;
 
+window.addEventListener('DOMContentLoaded', () => {
+    console.log('=== PAGE LOADED ===' );
+    console.log('innerWidth:', window.innerWidth);
+    console.log('outerWidth:', window.outerWidth);
+    console.log('screen.width:', screen.width);
+    console.log('devicePixelRatio:', window.devicePixelRatio);
+    init();
+});
+
 function detectScreenSize() {
-    screenWidth = window.innerWidth;
-    console.log('DEBUG: window.innerWidth =', screenWidth);
-    console.log('DEBUG: window.outerWidth =', window.outerWidth);
-    console.log('DEBUG: screen.width =', screen.width);
-    console.log('DEBUG: devicePixelRatio =', window.devicePixelRatio);
+    const w = window.innerWidth;
+    console.log('[detectScreenSize] width:', w);
     
-    if (screenWidth < 480) {
+    if (w < 480) {
         deviceMode = 'keitai';
-    } else if (screenWidth < 768) {
+    } else if (w < 768) {
         deviceMode = 'phone';
-    } else if (screenWidth < 1024) {
+    } else if (w < 1024) {
         deviceMode = 'tablet';
     } else {
         deviceMode = 'desktop';
     }
     
-    console.log('DETECTED: Screen Mode:', deviceMode, '(' + screenWidth + 'px)');
+    console.log('[detectScreenSize] MODE:', deviceMode, 'WIDTH:', w);
     applyDeviceLayout();
 }
 
 function applyDeviceLayout() {
     const sidebar = document.getElementById('sidebar');
     const chatContainer = document.getElementById('chatContainer');
+    console.log('[applyLayout] deviceMode=' + deviceMode + ', active=' + active);
     
     if (deviceMode === 'keitai') {
-        // Keitai: Show contacts by default, chat replaces when selected
         if (active) {
             sidebar.classList.add('chat-active');
             chatContainer.classList.add('chat-active');
+            console.log('[applyLayout] showing chat');
         } else {
             sidebar.classList.remove('chat-active');
             chatContainer.classList.remove('chat-active');
+            console.log('[applyLayout] showing sidebar');
         }
     } else {
-        // Desktop/Tablet/Phone: Show both side by side (or stacked)
         sidebar.classList.remove('chat-active');
         chatContainer.classList.remove('chat-active');
     }
@@ -970,9 +738,7 @@ function applyDeviceLayout() {
 
 function init() {
     detectScreenSize();
-    window.addEventListener('resize', () => {
-        detectScreenSize();
-    });
+    window.addEventListener('resize', () => detectScreenSize());
     
     contacts = JSON.parse(localStorage.getItem('anms_contacts') || '[]');
     chats = JSON.parse(localStorage.getItem('anms_chats') || '{}');
@@ -982,7 +748,6 @@ function init() {
 }
 
 function goBack() {
-    // Keitai: Return to contact selection
     active = null;
     document.getElementById('msg').disabled = true;
     document.getElementById('sendBtn').disabled = true;
@@ -999,11 +764,9 @@ function connectWS() {
         ws = new WebSocket('ws://' + host + ':8765');
         ws.onopen = () => updateStatus('✓ Connected');
         ws.onmessage = e => {
-            console.log('WS Message:', e.data);
             if (e.data.startsWith('INCOMING_SMS|')) {
                 const [_, phone, ...msgParts] = e.data.split('|');
                 const text = msgParts.join('|');
-                console.log('New SMS from:', phone, text);
                 pollChat(phone);
             }
         };
@@ -1027,14 +790,12 @@ function addContact() {
 }
 
 function selectContact(p) {
-    console.log('Selecting contact:', p);
     active = p;
     document.getElementById('msg').disabled = false;
     document.getElementById('sendBtn').disabled = false;
     document.getElementById('chatHeader').textContent = '📱 ' + p;
     clearInterval(pollInterval);
     
-    // Initialize pagination state for this contact
     if (!messageState[p]) {
         messageState[p] = { total: 0, offset: 0, loading: false, lastTotal: 0 };
     }
@@ -1049,22 +810,16 @@ function selectContact(p) {
 }
 
 function loadChat(phone) {
-    console.log('Loading latest messages for:', phone);
+    console.log('Loading messages for:', phone);
     updateStatus('⏳ Loading...');
     
-    // Always fetch the LATEST messages (offset=0, get the most recent MESSAGES_PER_LOAD messages)
     return fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(phone) + '?offset=0&limit=' + MESSAGES_PER_LOAD)
         .then(r => {
-            console.log('Response status:', r.status);
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.json();
         })
         .then(data => {
-            console.log('Loaded', data.messages.length, 'messages (total:', data.total + ')');
-            // Store the new messages - FRESH load for this phone
             chats[phone] = data.messages;
-            
-            // Initialize state with FRESH data
             messageState[phone] = {
                 total: data.total,
                 offset: MESSAGES_PER_LOAD,
@@ -1083,42 +838,25 @@ function loadChat(phone) {
 }
 
 function pollChat(phone) {
-    // Poll for NEW messages - same principle as initial load
-    console.log('Polling for:', phone, 'lastTotal was:', messageState[phone]?.lastTotal);
-    
     fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(phone) + '?offset=0&limit=' + MESSAGES_PER_LOAD)
-        .then(r => {
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            return r.json();
-        })
+        .then(r => r.json())
         .then(data => {
-            console.log('Poll response: Got', data.messages.length, 'messages (total:', data.total + ')');
-            
             const state = messageState[phone];
-            if (!state) {
-                console.log('No state for phone', phone);
-                return;
-            }
+            if (!state) return;
             
-            // Only update if TOTAL changed (new messages in the conversation)
             if (data.total > state.lastTotal) {
-                console.log('New messages detected! Total went from', state.lastTotal, 'to', data.total);
-                // New messages arrived - use same principle as loadChat: fetch fresh data and rebuild
                 chats[phone] = data.messages;
                 state.lastTotal = data.total;
                 state.total = data.total;
                 
                 localStorage.setItem('anms_chats', JSON.stringify(chats));
                 
-                // If this is the active chat, rebuild the view (just like loadChat)
                 if (phone === active) {
                     renderMsgs();
-                    // Auto-scroll to bottom to show new messages
                     const area = document.getElementById('messages');
                     area.scrollTop = area.scrollHeight;
                 }
                 
-                // Update contact count
                 renderContacts();
             }
         })
@@ -1134,13 +872,9 @@ function loadOlderMessages() {
     const btn = document.getElementById('loadOlderBtn');
     if (btn) btn.disabled = true;
     
-    console.log('Loading older messages: offset=' + state.offset);
-    
     fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(active) + '?offset=' + state.offset + '&limit=' + MESSAGES_PER_LOAD)
         .then(r => r.json())
         .then(data => {
-            console.log('Loaded', data.messages.length, 'older messages');
-            // Prepend older messages to the beginning
             chats[active] = data.messages.concat(chats[active]);
             state.offset += MESSAGES_PER_LOAD;
             state.loading = false;
@@ -1154,18 +888,10 @@ function loadOlderMessages() {
         });
 }
 
-function isScrolledToBottom() {
-    const area = document.getElementById('messages');
-    return area.scrollHeight - area.scrollTop - area.clientHeight < 50;
-}
-
 function startPolling() {
-    console.log('Started polling for:', active, '(1 second interval)');
     pollInterval = setInterval(() => {
-        if (active) {
-            pollChat(active);
-        }
-    }, 1000); // Poll every 1 second
+        if (active) { pollChat(active); }
+    }, 1000);
 }
 
 function send() {
@@ -1173,7 +899,6 @@ function send() {
     const text = document.getElementById('msg').value.trim();
     if (!text) return;
     
-    console.log('Sending to:', active);
     document.getElementById('sendBtn').disabled = true;
     document.getElementById('msg').value = '';
     updateStatus('⏳ Sending...');
@@ -1184,11 +909,9 @@ function send() {
     })
     .then(r => r.json())
     .then(data => {
-        console.log('Send response:', data);
         document.getElementById('sendBtn').disabled = false;
         if (data.success) {
             updateStatus('✓ Sent');
-            // Poll immediately after send to get the sent message
             setTimeout(() => pollChat(active), 500);
         } else {
             updateStatus('✗ Send failed: ' + data.message);
@@ -1205,19 +928,16 @@ function renderContacts() {
     const html = contacts.map((p, idx) => {
         const cnt = (chats[p] || []).length;
         const cls = active === p ? 'active' : '';
-        return '<div class="contact-item ' + cls + '" onclick="window.selectContactPhone(' + idx + ')"><div class="contact-number">' + escapeHtml(p) + '</div><div class="contact-count">' + cnt + ' msgs</div></div>';
+        return '<div class="contact-item ' + cls + '" onclick="selectContactByIdx(' + idx + ')"><div class="contact-number">' + escapeHtml(p) + '</div><div class="contact-count">' + cnt + ' msgs</div></div>';
     }).join('');
     document.getElementById('contacts').innerHTML = html || '';
 }
 
-window.selectContactPhone = function(idx) {
-    if (contacts[idx]) {
-        selectContact(contacts[idx]);
-    }
+window.selectContactByIdx = function(idx) {
+    if (contacts[idx]) { selectContact(contacts[idx]); }
 }
 
 function renderMsgs() {
-    // Full rebuild - same as when user clicks to open chat
     const msgs = chats[active] || [];
     if (!msgs.length) {
         document.getElementById('messages').innerHTML = '<div class="empty-state">No messages yet</div>';
@@ -1227,9 +947,8 @@ function renderMsgs() {
     const state = messageState[active] || { total: msgs.length, offset: 0 };
     let html = '';
     
-    // Show "Load older" button if there are more messages
     if (state.offset < state.total) {
-        html += '<button id="loadOlderBtn" class="load-older-btn" onclick="loadOlderMessages()">↑ Load older messages</button>';
+        html += '<button id="loadOlderBtn" class="load-older-btn" type="button" onclick="loadOlderMessages()">↑ Load older messages</button>';
     }
     
     html += msgs.map(m => {
@@ -1259,8 +978,6 @@ document.getElementById('msg').addEventListener('keypress', e => {
 document.getElementById('phone').addEventListener('keypress', e => {
     if (e.key === 'Enter') addContact();
 });
-
-init();
 </script>
 </body>
 </html>"""
