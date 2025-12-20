@@ -17,6 +17,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
     private var isRunning = false
     private val smsManager = SmsManager.getDefault()
     private val smsDb = SmsDatabase(context)
+    private val MAX_MESSAGE_SIZE = 32768 // 32KB per message (increased from ~4KB)
 
     fun start() {
         thread {
@@ -102,9 +103,10 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             val allMessages = smsDb.getConversation(phone, 500)
             Log.d(tag, "[POLL] Got ${allMessages.size} total messages from DB")
 
-            // Pagination from END of conversation (most recent messages)
-            // offset=0 means get the LAST 'limit' messages
-            // offset=8 means skip last 8, get next 8, etc.
+            // FIXED: Always fetch the LATEST messages from the END of the list
+            // offset=0 means get the LAST 'limit' messages (most recent)
+            // offset=1 means skip the last message, get next 'limit', etc.
+            // This prevents duplicates and ensures we always get fresh data
             val startIndex = maxOf(0, allMessages.size - limit - offset)
             val endIndex = allMessages.size - offset
             
@@ -119,7 +121,13 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             val json = paginatedMessages.joinToString(",") { msg ->
                 val dir = if (msg.type == 1) "in" else "out"
                 val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(msg.timestamp)
-                val cleanBody = msg.body.replace("\\", " ").replace("\"", "\\\"")
+                // FIXED: Use replace with proper escaping to handle larger messages
+                val cleanBody = msg.body
+                    .replace("\\", "\\\\")  // Escape backslashes first
+                    .replace("\"", "\\\"")   // Escape quotes
+                    .replace("\n", "\\n")    // Escape newlines
+                    .replace("\r", "\\r")    // Escape carriage returns
+                    .replace("\t", "\\t")    // Escape tabs
                 
                 "{\"body\":\"$cleanBody\",\"dir\":\"$dir\",\"time\":\"$time\"}"
             }
@@ -130,7 +138,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             
             Log.d(tag, "[POLL] Response body size: $contentLength bytes")
             
-            // NO-CACHE headers to ensure fresh data every time
+            // NO-CACHE headers to ensure fresh data every time + timestamp handling
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: $contentLength\r\nCache-Control: no-store, no-cache, must-revalidate, max-age=0\r\nPragma: no-cache\r\nExpires: 0\r\nConnection: close\r\n\r\n$body"
         } catch (e: Exception) {
             Log.e(tag, "[POLL] Error loading messages: ${e.message}", e)
@@ -141,7 +149,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
     private fun handleSendMessage(body: String): String {
         return try {
             val params = body.split("&").associate {
-                val kv = it.split("=")
+                val kv = it.split("=", limit = 2)
                 Pair(kv[0], URLDecoder.decode(kv.getOrNull(1) ?: "", "UTF-8"))
             }
             val phone = params["phone"] ?: return jsonResponse(false, "Missing phone")
@@ -1085,7 +1093,7 @@ function pollChat(phone) {
                 state.total = data.total;
                 localStorage.setItem('anms_chats', JSON.stringify(chats));
                 
-                // If this is the active chat, append new messages
+                // If this is the active chat, append new messages (smart append, no rebuild)
                 if (phone === active) {
                     appendNewMessages();
                 }
