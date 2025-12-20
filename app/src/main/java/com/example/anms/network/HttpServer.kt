@@ -1191,12 +1191,18 @@ function send() {
 }
 
 function renderContacts() {
-    const html = contacts.map(p => {
+    const html = contacts.map((p, idx) => {
         const cnt = (chats[p] || []).length;
         const cls = active === p ? 'active' : '';
-        return '<div class="contact-item ' + cls + '" onclick="selectContact(\'' + p.replace(/'/g, "\\\\'") + '\')"><div class="contact-number">' + escapeHtml(p) + '</div><div class="contact-count">' + cnt + ' messages</div></div>';
+        return '<div class="contact-item ' + cls + '" onclick="window.selectContactPhone(' + idx + ')"><div class="contact-number">' + escapeHtml(p) + '</div><div class="contact-count">' + cnt + ' messages</div></div>';
     }).join('');
     document.getElementById('contacts').innerHTML = html || '<div style="color: #666; text-align: center; padding: 20px; font-size: 12px;">No contacts yet</div>';
+}
+
+window.selectContactPhone = function(idx) {
+    if (contacts[idx]) {
+        selectContact(contacts[idx]);
+    }
 }
 
 function renderMsgs() {
