@@ -17,7 +17,7 @@ import com.example.anms.sms.SmsManager
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var webSocketServer: WebSocketServer
-    private lateinit var httpServer: HttpServer
+    private var httpServer: HttpServer? = null
     private lateinit var smsManager: SmsManager
     private lateinit var messageAdapter: MessageAdapter
 
@@ -140,10 +140,13 @@ class MainActivity : AppCompatActivity() {
         webSocketServer.start()
         
         // Start HTTP server to serve web client
-        httpServer = HttpServer(this, 8080)
-        httpServer.start()
-        
-        binding.serverStatusTextView.text = getString(R.string.server_running) + "\nHTTP: 8080 | WS: 8765"
+        try {
+            httpServer = HttpServer(this, 8080)
+            binding.serverStatusTextView.text = getString(R.string.server_running) + "\nHTTP: 8080 | WS: 8765"
+        } catch (e: Exception) {
+            binding.serverStatusTextView.text = "HTTP Server Error: ${e.message}"
+            Toast.makeText(this, "HTTP Server failed: ${e.message}", Toast.LENGTH_LONG).show()
+        }
     }
 
     override fun onDestroy() {
@@ -151,8 +154,8 @@ class MainActivity : AppCompatActivity() {
         if (::webSocketServer.isInitialized) {
             webSocketServer.stopServer()
         }
-        if (::httpServer.isInitialized) {
-            httpServer.stop()
+        if (httpServer != null) {
+            httpServer?.stopServer()
         }
     }
 }
