@@ -611,7 +611,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 width: 100%;
                 border: none;
                 padding: 8px;
-                gap: 8px;
+                gap: 6px;
                 flex: 0 1 auto;
                 display: flex;
                 flex-direction: column;
@@ -624,46 +624,47 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             }
             
             .sidebar-header {
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 600;
-                padding: 4px 0;
+                padding: 2px 0;
                 flex-shrink: 0;
             }
             
+            /* Stack input vertically on ultra-narrow screens */
             .phone-input-group {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 6px;
+                display: flex;
+                flex-direction: column;
                 width: 100%;
+                gap: 4px;
                 flex-shrink: 0;
             }
             
             .phone-input-group input {
+                width: 100%;
                 padding: 10px 8px;
                 font-size: 13px;
                 border-radius: 4px;
-                grid-column: span 1;
             }
             
             .phone-input-group button {
+                width: 100%;
                 padding: 10px 8px;
                 font-size: 12px;
                 border-radius: 4px;
-                grid-column: span 1;
             }
             
             .contacts-list {
                 flex: 1 1 auto;
                 max-height: none;
-                min-height: 120px;
+                min-height: 100px;
                 gap: 4px;
                 padding-bottom: 8px;
                 overflow-y: auto;
             }
             
             .contact-item {
-                padding: 12px;
-                font-size: 13px;
+                padding: 10px;
+                font-size: 12px;
                 border-radius: 6px;
                 border: 1px solid #333;
                 cursor: pointer;
@@ -676,9 +677,9 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             }
             
             .contact-number {
-                margin-bottom: 4px;
+                margin-bottom: 2px;
                 font-weight: 600;
-                font-size: 14px;
+                font-size: 13px;
             }
             
             .contact-count {
@@ -701,16 +702,16 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             
             .chat-header {
                 padding: 8px;
-                font-size: 13px;
+                font-size: 12px;
                 font-weight: 600;
-                gap: 8px;
+                gap: 6px;
                 flex-shrink: 0;
             }
             
             .chat-header-back {
                 display: block !important;
-                padding: 6px 10px !important;
-                font-size: 12px;
+                padding: 6px 8px !important;
+                font-size: 11px;
                 flex-shrink: 0;
                 background: #4a9eff;
                 border: none;
@@ -730,13 +731,13 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
-                font-size: 13px;
+                font-size: 12px;
             }
             
             /* Compact vertical message layout for keitai */
             .messages-area {
-                padding: 6px 8px;
-                gap: 4px;
+                padding: 6px 6px;
+                gap: 3px;
                 font-size: 12px;
                 flex-direction: column;
                 flex: 1;
@@ -763,11 +764,11 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             
             .message-bubble {
                 max-width: 100%;
-                padding: 8px 10px;
-                font-size: 13px;
-                border-radius: 6px;
+                padding: 6px 8px;
+                font-size: 12px;
+                border-radius: 5px;
                 word-break: break-word;
-                line-height: 1.3;
+                line-height: 1.2;
             }
             
             .message-group.in .message-time {
@@ -779,38 +780,38 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             }
 
             .message-time {
-                font-size: 11px;
+                font-size: 10px;
                 margin-top: 2px;
                 display: block;
                 opacity: 0.8;
             }
             
             .input-section {
-                padding: 8px;
-                gap: 6px;
+                padding: 6px;
+                gap: 4px;
                 flex-shrink: 0;
             }
 
             .input-section textarea {
-                padding: 8px;
-                font-size: 13px;
-                min-height: 32px;
-                max-height: 60px;
+                padding: 6px;
+                font-size: 12px;
+                min-height: 28px;
+                max-height: 50px;
             }
 
             .input-section button {
-                padding: 8px 12px;
-                font-size: 12px;
+                padding: 6px 10px;
+                font-size: 11px;
             }
             
             .status-bar {
-                padding: 6px 8px;
-                font-size: 11px;
+                padding: 4px 6px;
+                font-size: 10px;
                 flex-shrink: 0;
             }
             
             .empty-state {
-                font-size: 13px;
+                font-size: 12px;
             }
         }
         
