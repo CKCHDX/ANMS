@@ -543,7 +543,7 @@ let ws, activePhone, activeContact, chats = {}, contacts = [], pollInterval;
 
 // Detect back button (physical or browser)
 window.addEventListener('keydown', e => {
-    if (e.key === 'Backspace' || e.key === 'Escape' || e.key === 'ArrowLeft') {
+    if (e.key === 'Backspace' || e.key === 'Escape') {
         if (!document.getElementById('screenChat').classList.contains('hidden')) {
             goBack();
             e.preventDefault();
@@ -558,8 +558,10 @@ window.addEventListener('popstate', () => {
 });
 
 function init() {
+    console.log('Initializing ANMS...');
     contacts = JSON.parse(localStorage.getItem('anms_contacts') || '[]');
     chats = JSON.parse(localStorage.getItem('anms_chats') || '{}');
+    console.log('Loaded contacts:', contacts);
     renderContacts();
     connectWS();
 }
@@ -574,22 +576,37 @@ function addContact() {
     const phone = document.getElementById('phoneInput').value.trim();
     const name = document.getElementById('nameInput').value.trim();
     
-    if (!phone) { alert('Enter phone number'); return; }
-    if (!name) { alert('Enter contact name'); return; }
+    console.log('Adding contact:', { phone, name });
     
+    if (!phone) { 
+        alert('Enter phone number');
+        return;
+    }
+    if (!name) { 
+        alert('Enter contact name');
+        return;
+    }
+    
+    // Check if phone already exists
     if (contacts.some(c => c.phone === phone)) {
         alert('Phone number already exists');
         return;
     }
     
-    const contact = { phone, name };
+    const contact = { phone: phone, name: name };
     contacts.push(contact);
+    console.log('Contact added, total contacts:', contacts);
+    
     localStorage.setItem('anms_contacts', JSON.stringify(contacts));
+    console.log('Saved to localStorage');
+    
     clearInputs();
     renderContacts();
+    console.log('Rendered contacts');
 }
 
 function selectContact(phone, name) {
+    console.log('Selecting contact:', { phone, name });
     activePhone = phone;
     activeContact = name;
     document.getElementById('screenContacts').classList.add('hidden');
@@ -606,6 +623,7 @@ function selectContact(phone, name) {
 }
 
 function goBack() {
+    console.log('Going back to contact list');
     activePhone = null;
     activeContact = null;
     document.getElementById('screenChat').classList.add('hidden');
@@ -619,39 +637,59 @@ function connectWS() {
     const host = window.location.hostname;
     try {
         ws = new WebSocket('ws://' + host + ':8765');
-        ws.onopen = () => updateStatus('Connected');
+        ws.onopen = () => {
+            console.log('WebSocket connected');
+            updateStatus('Connected');
+        };
         ws.onmessage = e => {
+            console.log('WebSocket message:', e.data);
             if (e.data.startsWith('INCOMING_SMS|')) {
                 const [_, phone, ...msgParts] = e.data.split('|');
                 const text = msgParts.join('|');
+                console.log('New SMS from:', phone, text);
                 loadChat(phone).then(() => {
                     if (activePhone === phone) renderMessages();
                 });
             }
         };
-        ws.onclose = () => { updateStatus('Reconnecting...'); setTimeout(connectWS, 3000); };
-        ws.onerror = () => updateStatus('Error');
+        ws.onclose = () => { 
+            console.log('WebSocket disconnected');
+            updateStatus('Reconnecting...'); 
+            setTimeout(connectWS, 3000); 
+        };
+        ws.onerror = (err) => {
+            console.log('WebSocket error:', err);
+            updateStatus('Error');
+        };
     } catch (e) {
+        console.log('WebSocket connect error:', e);
         updateStatus('WS Error');
     }
 }
 
 function loadChat(phone) {
+    console.log('Loading chat for phone:', phone);
     updateStatus('Loading...');
     return fetch('http://' + window.location.hostname + ':8080/api/chat/' + encodeURIComponent(phone))
         .then(r => {
+            console.log('Chat response status:', r.status);
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.json();
         })
         .then(data => {
+            console.log('Chat loaded:', data.length, 'messages');
             chats[phone] = data;
             localStorage.setItem('anms_chats', JSON.stringify(chats));
             updateStatus('Ready');
         })
-        .catch(e => updateStatus('Error'));
+        .catch(e => {
+            console.log('Load error:', e);
+            updateStatus('Error');
+        });
 }
 
 function startPolling() {
+    console.log('Starting polling for:', activePhone);
     pollInterval = setInterval(() => {
         if (activePhone) {
             loadChat(activePhone).then(() => renderMessages());
@@ -664,6 +702,7 @@ function sendMessage() {
     const text = document.getElementById('msgInput').value.trim();
     if (!text) return;
     
+    console.log('Sending message to:', activePhone);
     document.getElementById('sendBtn').disabled = true;
     document.getElementById('msgInput').value = '';
     updateStatus('Sending...');
@@ -674,6 +713,7 @@ function sendMessage() {
     })
     .then(r => r.json())
     .then(data => {
+        console.log('Send response:', data);
         document.getElementById('sendBtn').disabled = false;
         if (data.success) {
             updateStatus('Sent');
@@ -683,20 +723,28 @@ function sendMessage() {
         }
     })
     .catch(e => {
+        console.log('Send error:', e);
         updateStatus('Error');
         document.getElementById('sendBtn').disabled = false;
     });
 }
 
 function renderContacts() {
-    const html = contacts.length === 0 
-        ? '<div class="empty-message">No contacts added yet</div>'
-        : contacts.map(c => {
+    console.log('Rendering contacts, count:', contacts.length);
+    
+    let html;
+    if (contacts.length === 0) {
+        html = '<div class="empty-message">No contacts added yet</div>';
+    } else {
+        html = contacts.map((c, idx) => {
             const msgCount = (chats[c.phone] || []).length;
-            return '<div class="contact-item" onclick="selectContact(\'' + c.phone.replace(/'/g, "\\\\'") + '\', \'' + c.name.replace(/'/g, "\\\\'") + '\')"><div class="contact-name">' + escapeHtml(c.name) + '</div><div class="contact-phone">' + escapeHtml(c.phone) + '</div><div class="contact-count">' + msgCount + ' messages</div></div>';
+            const clickStr = "selectContact('" + c.phone.replace(/'/g, "\\\\\\\"") + "', '" + c.name.replace(/'/g, "\\\\\\\"") + "')";
+            return '<div class="contact-item" onclick="' + clickStr + '"><div class="contact-name">' + escapeHtml(c.name) + '</div><div class="contact-phone">' + escapeHtml(c.phone) + '</div><div class="contact-count">' + msgCount + ' messages</div></div>';
         }).join('');
+    }
     
     document.getElementById('contactsList').innerHTML = html;
+    console.log('Contacts rendered');
 }
 
 function renderMessages() {
