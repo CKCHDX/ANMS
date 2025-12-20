@@ -100,11 +100,11 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
         return try {
             Log.d(tag, "Loading messages for: $phone (offset=$offset, limit=$limit)")
             val allMessages = smsDb.getConversation(phone, 500)
-            Log.d(tag, "Got ${allMessages.size} total messages")
+            Log.d(tag, "Got ${allMessages.size} total messages for phone $phone")
 
             // Pagination from END of conversation (most recent messages)
-            // offset=0 means get the LAST 'limit' messages
-            // offset=8 means skip last 8, get next 8, etc.
+            // offset=0 means get the LAST 'limit' messages (most recent)
+            // offset=8 means skip last 8, get next 8 older, etc.
             val startIndex = maxOf(0, allMessages.size - limit - offset)
             val endIndex = allMessages.size - offset
             
@@ -113,6 +113,8 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             } else {
                 emptyList()
             }
+
+            Log.d(tag, "Returning ${paginatedMessages.size} paginated messages")
 
             val json = paginatedMessages.joinToString(",") { msg ->
                 val dir = if (msg.type == 1) "in" else "out"
@@ -192,7 +194,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             background: #0f0f0f;
             color: #e0e0e0;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            font-size: 14px;
+            font-size: 15px;
         }
         
         body {
@@ -235,7 +237,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             border: 1px solid #404040;
             border-radius: 6px;
             color: #e0e0e0;
-            font-size: 13px;
+            font-size: 14px;
         }
         
         .phone-input-group input:focus {
@@ -279,7 +281,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.2s;
-            font-size: 13px;
+            font-size: 14px;
         }
         
         .contact-item:hover {
@@ -398,10 +400,10 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
         
         .message-bubble {
             max-width: 65%;
-            padding: 10px 14px;
+            padding: 12px 16px;
             border-radius: 12px;
             word-wrap: break-word;
-            font-size: 14px;
+            font-size: 16px;
             line-height: 1.4;
         }
         
@@ -418,7 +420,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
         }
         
         .message-time {
-            font-size: 12px;
+            font-size: 13px;
             margin-top: 4px;
             opacity: 0.6;
         }
@@ -440,7 +442,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             height: 100%;
             color: #666;
             text-align: center;
-            font-size: 14px;
+            font-size: 15px;
         }
         
         .input-section {
@@ -459,7 +461,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             border-radius: 6px;
             color: #e0e0e0;
             font-family: inherit;
-            font-size: 14px;
+            font-size: 15px;
             resize: none;
             max-height: 80px;
             min-height: 40px;
@@ -502,7 +504,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             padding: 8px 16px;
             background: #1a1a1a;
             border-top: 1px solid #333;
-            font-size: 12px;
+            font-size: 13px;
             color: #999;
             font-weight: 500;
         }
@@ -543,7 +545,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             
             .message-bubble {
                 max-width: 75%;
-                font-size: 13px;
+                font-size: 15px;
             }
         }
         
@@ -568,7 +570,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             
             .message-bubble {
                 max-width: 85%;
-                font-size: 13px;
+                font-size: 15px;
             }
             
             .input-section {
@@ -577,7 +579,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             }
             
             .input-section textarea {
-                font-size: 13px;
+                font-size: 14px;
                 min-height: 36px;
             }
             
@@ -593,7 +595,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             .phone-input-group input,
             .phone-input-group button {
                 padding: 8px 10px;
-                font-size: 12px;
+                font-size: 13px;
             }
         }
         
@@ -632,7 +634,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             
             .phone-input-group input {
                 padding: 10px 8px;
-                font-size: 12px;
+                font-size: 13px;
                 border-radius: 4px;
                 grid-column: span 1;
             }
@@ -724,9 +726,9 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             
             /* Compact vertical message layout for keitai */
             .messages-area {
-                padding: 4px 6px;
-                gap: 3px;
-                font-size: 11px;
+                padding: 6px 8px;
+                gap: 4px;
+                font-size: 12px;
                 flex-direction: column;
             }
             
@@ -751,11 +753,11 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             
             .message-bubble {
                 max-width: 100%;
-                padding: 5px 7px;
-                font-size: 10px;
+                padding: 8px 10px;
+                font-size: 13px;
                 border-radius: 6px;
                 word-break: break-word;
-                line-height: 1.2;
+                line-height: 1.3;
             }
             
             .message-group.in .message-time {
@@ -767,36 +769,36 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             }
 
             .message-time {
-                font-size: 8px;
-                margin-top: 0px;
+                font-size: 11px;
+                margin-top: 2px;
                 display: block;
                 opacity: 0.8;
             }
             
             .input-section {
-                padding: 6px;
-                gap: 4px;
+                padding: 8px;
+                gap: 6px;
             }
 
             .input-section textarea {
-                padding: 6px;
-                font-size: 11px;
-                min-height: 28px;
-                max-height: 56px;
+                padding: 8px;
+                font-size: 13px;
+                min-height: 32px;
+                max-height: 60px;
             }
 
             .input-section button {
-                padding: 6px 10px;
-                font-size: 10px;
+                padding: 8px 12px;
+                font-size: 12px;
             }
             
             .status-bar {
-                padding: 4px 6px;
-                font-size: 10px;
+                padding: 6px 8px;
+                font-size: 11px;
             }
             
             .empty-state {
-                font-size: 12px;
+                font-size: 13px;
             }
         }
         
@@ -816,8 +818,8 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             }
             
             .message-bubble {
-                padding: 6px 8px;
-                font-size: 11px;
+                padding: 7px 9px;
+                font-size: 12px;
             }
             
             .input-section {
@@ -826,13 +828,13 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             
             .input-section textarea {
                 min-height: 28px;
-                font-size: 11px;
+                font-size: 12px;
                 padding: 6px;
             }
             
             .input-section button {
                 padding: 6px 10px;
-                font-size: 10px;
+                font-size: 11px;
             }
             
             .contact-item {
@@ -875,7 +877,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
 <script>
 let ws, active, chats = {}, contacts = [], pollInterval, screenWidth = window.innerWidth;
 let deviceMode = 'desktop'; // 'desktop', 'tablet', 'phone', 'keitai'
-let messageState = {}; // Track pagination state per contact: { phone: { total, offset, loading, lastSeenCount } }
+let messageState = {}; // Track pagination state per contact: { phone: { total, offset, loading, lastSeenCount, lastTotal } }
 const MESSAGES_PER_LOAD = 8;
 
 function detectScreenSize() {
@@ -983,7 +985,7 @@ function selectContact(p) {
     
     // Initialize pagination state for this contact
     if (!messageState[p]) {
-        messageState[p] = { total: 0, offset: 0, loading: false, lastSeenCount: 0 };
+        messageState[p] = { total: 0, offset: 0, loading: false, lastSeenCount: 0, lastTotal: 0 };
     }
     
     applyDeviceLayout();
@@ -999,7 +1001,7 @@ function loadChat(phone) {
     console.log('Loading latest messages for:', phone);
     updateStatus('⏳ Loading...');
     
-    // Always fetch the LATEST messages (offset=0)
+    // Always fetch the LATEST messages (offset=0, get the most recent MESSAGES_PER_LOAD messages)
     return fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(phone) + '?offset=0&limit=' + MESSAGES_PER_LOAD)
         .then(r => {
             console.log('Response status:', r.status);
@@ -1008,15 +1010,16 @@ function loadChat(phone) {
         })
         .then(data => {
             console.log('Loaded', data.messages.length, 'messages (total:', data.total + ')');
-            // Store the new messages
+            // Store the new messages - FRESH load for this phone
             chats[phone] = data.messages;
             
-            // Initialize state
+            // Initialize state with FRESH data
             messageState[phone] = {
                 total: data.total,
                 offset: MESSAGES_PER_LOAD,
                 loading: false,
-                lastSeenCount: data.messages.length  // Track how many we've displayed
+                lastSeenCount: data.messages.length,
+                lastTotal: data.total
             };
             
             localStorage.setItem('anms_chats', JSON.stringify(chats));
@@ -1030,7 +1033,7 @@ function loadChat(phone) {
 }
 
 function pollChat(phone) {
-    // Poll for new messages
+    // Poll for NEW messages only
     console.log('Polling for:', phone);
     
     fetch('http://' + window.location.hostname + ':8080/api/messages/' + encodeURIComponent(phone) + '?offset=0&limit=' + MESSAGES_PER_LOAD)
@@ -1044,30 +1047,33 @@ function pollChat(phone) {
             const state = messageState[phone];
             if (!state) return;
             
-            // Check if there are NEW messages
-            const oldMessages = chats[phone] || [];
-            const newMessages = data.messages;
-            
-            console.log('Old count:', oldMessages.length, 'New count:', newMessages.length);
-            
-            // Only update if total count changed
-            if (newMessages.length > oldMessages.length) {
-                console.log('New messages detected!');
+            // Only update if TOTAL changed (new messages in the conversation)
+            if (data.total > state.lastTotal) {
+                console.log('Total changed from', state.lastTotal, 'to', data.total);
+                // New messages arrived
+                const oldMessages = chats[phone] || [];
+                const newMessages = data.messages;
+                
+                // Replace the chats with fresh data from server
                 chats[phone] = newMessages;
+                state.lastTotal = data.total;
                 state.total = data.total;
+                
                 localStorage.setItem('anms_chats', JSON.stringify(chats));
                 
                 // If this is the active chat, append new messages
                 if (phone === active) {
                     appendNewMessages();
                 }
+            } else {
+                console.log('No new messages (total unchanged)');
             }
         })
         .catch(e => console.error('Poll error:', e));
 }
 
 function appendNewMessages() {
-    // Only append NEW messages, don't rebuild entire DOM
+    // Only append NEW messages without rebuilding entire DOM
     if (!active) return;
     
     const state = messageState[active];
@@ -1143,12 +1149,12 @@ function isScrolledToBottom() {
 }
 
 function startPolling() {
-    console.log('Started polling for:', active);
+    console.log('Started polling for:', active, '(1 second interval)');
     pollInterval = setInterval(() => {
         if (active) {
             pollChat(active);
         }
-    }, 1000);
+    }, 1000); // Poll every 1 second
 }
 
 function send() {
@@ -1171,7 +1177,8 @@ function send() {
         document.getElementById('sendBtn').disabled = false;
         if (data.success) {
             updateStatus('✓ Sent');
-            setTimeout(() => pollChat(active), 1000);
+            // Poll immediately after send to get the sent message
+            setTimeout(() => pollChat(active), 500);
         } else {
             updateStatus('✗ Send failed: ' + data.message);
         }
