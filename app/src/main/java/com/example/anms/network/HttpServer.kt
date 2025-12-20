@@ -161,86 +161,348 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-    <title>ANMS Chat</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+    <title>ANMS - SMS Client</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: Courier, monospace; 
-            background: #1a1a1a; 
-            color: #00ff00; 
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            width: 100%;
+            height: 100%;
+            background: #0f0f0f;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+        }
+        
+        .main {
+            display: flex;
+            height: 100vh;
+            gap: 0;
+        }
+        
+        .sidebar {
+            width: 280px;
+            background: #1a1a1a;
+            border-right: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            gap: 12px;
+        }
+        
+        .sidebar-header {
+            font-weight: 600;
+            font-size: 16px;
+            color: #fff;
+        }
+        
+        .phone-input-group {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .phone-input-group input {
+            flex: 1;
+            padding: 10px 12px;
+            background: #252525;
+            border: 1px solid #404040;
+            border-radius: 6px;
+            color: #e0e0e0;
             font-size: 13px;
+        }
+        
+        .phone-input-group input:focus {
+            outline: none;
+            border-color: #4a9eff;
+            box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.1);
+        }
+        
+        .phone-input-group button {
+            padding: 10px 16px;
+            background: #4a9eff;
+            border: none;
+            border-radius: 6px;
+            color: #fff;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        
+        .phone-input-group button:hover {
+            background: #2e7dd9;
+        }
+        
+        .phone-input-group button:active {
+            transform: scale(0.95);
+        }
+        
+        .contacts-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .contact-item {
+            padding: 12px;
+            background: #252525;
+            border: 1px solid #333;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 13px;
+        }
+        
+        .contact-item:hover {
+            background: #303030;
+            border-color: #404040;
+        }
+        
+        .contact-item.active {
+            background: #4a9eff;
+            border-color: #4a9eff;
+            color: #fff;
+            font-weight: 600;
+        }
+        
+        .contact-number {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+        
+        .contact-count {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+        
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #0f0f0f;
+        }
+        
+        .chat-header {
+            padding: 16px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #333;
+            font-weight: 600;
+            font-size: 15px;
+            color: #fff;
+        }
+        
+        .messages-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .message-group {
+            display: flex;
+            margin-bottom: 4px;
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .message-group.in {
+            justify-content: flex-start;
+        }
+        
+        .message-group.out {
+            justify-content: flex-end;
+        }
+        
+        .message-bubble {
+            max-width: 65%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            word-wrap: break-word;
+            font-size: 14px;
             line-height: 1.4;
         }
-        .container { max-width: 240px; margin: 0 auto; padding: 6px; height: 100vh; display: flex; flex-direction: column; }
-        .header { background: #003300; padding: 8px; margin-bottom: 6px; border: 2px solid #00ff00; text-align: center; font-weight: bold; }
-        .controls { display: flex; gap: 4px; margin-bottom: 6px; }
-        .controls input { flex: 1; padding: 6px; background: #0a0a0a; border: 1px solid #00ff00; color: #00ff00; font-family: monospace; font-size: 12px; }
-        .controls button { padding: 6px 12px; background: #003300; color: #00ff00; border: 1px solid #00ff00; cursor: pointer; font-family: monospace; font-weight: bold; }
-        .controls button:active { background: #00ff00; color: #000; }
-        .contacts { 
-            background: #0a0a0a; 
-            border: 1px solid #00ff00; 
-            padding: 6px;
-            max-height: 60px; 
-            overflow-y: auto;
-            margin-bottom: 6px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
+        
+        .message-group.in .message-bubble {
+            background: #2a4a5a;
+            color: #ffd700;
+            border-bottom-left-radius: 4px;
         }
-        .contact { 
-            padding: 4px; 
-            cursor: pointer; 
-            border: 1px solid #003300;
+        
+        .message-group.out .message-bubble {
+            background: #1a4a2a;
+            color: #4ade80;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .message-time {
+            font-size: 12px;
+            margin-top: 4px;
+            opacity: 0.6;
+        }
+        
+        .message-group.in .message-time {
+            color: #ffd700;
+            text-align: left;
+        }
+        
+        .message-group.out .message-time {
+            color: #4ade80;
+            text-align: right;
+        }
+        
+        .empty-state {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #666;
+            text-align: center;
+            font-size: 14px;
+        }
+        
+        .input-section {
+            padding: 16px;
             background: #1a1a1a;
-            font-size: 12px;
-        }
-        .contact:hover { background: #003300; }
-        .contact.active { background: #00ff00; color: #000; font-weight: bold; }
-        .messages { 
-            flex: 1;
-            background: #0a0a0a; 
-            border: 1px solid #00ff00; 
-            padding: 6px;
-            overflow-y: auto;
-            margin-bottom: 6px;
+            border-top: 1px solid #333;
             display: flex;
-            flex-direction: column;
-            gap: 2px;
-            font-size: 12px;
+            gap: 12px;
         }
-        .msg { padding: 4px; word-wrap: break-word; }
-        .msg.in { color: #00ff00; }
-        .msg.out { color: #ffff00; }
-        .msg.time { color: #888; font-size: 10px; }
-        .input-area { display: flex; gap: 4px; margin-bottom: 6px; }
-        .input-area textarea { flex: 1; padding: 6px; background: #0a0a0a; border: 1px solid #00ff00; color: #00ff00; font-family: monospace; font-size: 12px; resize: none; height: 50px; }
-        .input-area button { padding: 6px 10px; background: #003300; color: #00ff00; border: 1px solid #00ff00; cursor: pointer; font-family: monospace; font-weight: bold; }
-        .input-area button:active { background: #00ff00; color: #000; }
-        .status { background: #003300; padding: 4px; text-align: center; font-size: 11px; border-top: 1px solid #00ff00; }
-        .loading { color: #ff6600; }
+        
+        .input-section textarea {
+            flex: 1;
+            padding: 10px 12px;
+            background: #252525;
+            border: 1px solid #404040;
+            border-radius: 6px;
+            color: #e0e0e0;
+            font-family: inherit;
+            font-size: 14px;
+            resize: none;
+            max-height: 80px;
+            min-height: 40px;
+        }
+        
+        .input-section textarea:focus {
+            outline: none;
+            border-color: #4a9eff;
+            box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.1);
+        }
+        
+        .input-section button {
+            padding: 10px 20px;
+            background: #4a9eff;
+            border: none;
+            border-radius: 6px;
+            color: #fff;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 13px;
+            white-space: nowrap;
+            transition: all 0.2s;
+            align-self: flex-end;
+        }
+        
+        .input-section button:hover {
+            background: #2e7dd9;
+        }
+        
+        .input-section button:active {
+            transform: scale(0.95);
+        }
+        
+        .input-section button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .status-bar {
+            padding: 8px 16px;
+            background: #1a1a1a;
+            border-top: 1px solid #333;
+            font-size: 12px;
+            color: #999;
+            font-weight: 500;
+        }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #404040;
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #505050;
+        }
+        
+        @media (max-width: 768px) {
+            .main {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                max-height: 35%;
+                border-right: none;
+                border-bottom: 1px solid #333;
+            }
+            
+            .chat-container {
+                min-height: 65%;
+            }
+            
+            .message-bubble {
+                max-width: 80%;
+            }
+        }
     </style>
 </head>
 <body>
-<div class="container">
-    <div class="header">ANMS SMS CHAT</div>
-    
-    <div class="controls">
-        <input type="tel" id="phone" placeholder="+1234567890" maxlength="20">
-        <button onclick="addContact()">Add</button>
+<div class="main">
+    <div class="sidebar">
+        <div class="sidebar-header">📱 Chats</div>
+        <div class="phone-input-group">
+            <input type="tel" id="phone" placeholder="+1234567890" maxlength="20">
+            <button onclick="addContact()">Add</button>
+        </div>
+        <div class="contacts-list" id="contacts"></div>
     </div>
     
-    <div class="contacts" id="contacts"></div>
-    
-    <div class="messages" id="messages"></div>
-    
-    <div class="input-area">
-        <textarea id="msg" placeholder="Message..." disabled></textarea>
-        <button onclick="send()" id="sendBtn" disabled>Send</button>
+    <div class="chat-container">
+        <div class="chat-header" id="chatHeader">Select a contact</div>
+        <div class="messages-area" id="messages"><div class="empty-state">👈 Select a contact to start chatting</div></div>
+        <div class="input-section">
+            <textarea id="msg" placeholder="Type a message..." disabled></textarea>
+            <button onclick="send()" id="sendBtn" disabled>Send</button>
+        </div>
+        <div class="status-bar" id="status">✓ Ready</div>
     </div>
-    
-    <div class="status" id="status">Ready</div>
 </div>
 
 <script>
@@ -257,7 +519,7 @@ function connectWS() {
     const host = window.location.hostname;
     try {
         ws = new WebSocket('ws://' + host + ':8765');
-        ws.onopen = () => updateStatus('Connected');
+        ws.onopen = () => updateStatus('✓ Connected');
         ws.onmessage = e => {
             console.log('WS Message:', e.data);
             if (e.data.startsWith('INCOMING_SMS|')) {
@@ -269,18 +531,18 @@ function connectWS() {
                 });
             }
         };
-        ws.onclose = () => { updateStatus('Offline'); setTimeout(connectWS, 3000); };
-        ws.onerror = (e) => { console.error('WS Error:', e); updateStatus('Error'); };
+        ws.onclose = () => { updateStatus('⚠ Reconnecting...'); setTimeout(connectWS, 3000); };
+        ws.onerror = (e) => { console.error('WS Error:', e); updateStatus('✗ Error'); };
     } catch (e) {
         console.error('WS Connect Error:', e);
-        updateStatus('WS Error');
+        updateStatus('✗ WS Error');
     }
 }
 
 function addContact() {
     const p = document.getElementById('phone').value.trim();
-    if (!p) { alert('Enter phone'); return; }
-    if (contacts.includes(p)) { alert('Already added'); return; }
+    if (!p) { alert('Enter phone number'); return; }
+    if (contacts.includes(p)) { alert('Already in contacts'); return; }
     contacts.push(p);
     localStorage.setItem('anms_contacts', JSON.stringify(contacts));
     document.getElementById('phone').value = '';
@@ -294,6 +556,7 @@ function selectContact(p) {
     renderContacts();
     document.getElementById('msg').disabled = false;
     document.getElementById('sendBtn').disabled = false;
+    document.getElementById('chatHeader').textContent = '📱 ' + p;
     clearInterval(pollInterval);
     loadChat(p).then(() => {
         renderMsgs();
@@ -303,7 +566,7 @@ function selectContact(p) {
 
 function loadChat(phone) {
     console.log('Loading chat for:', phone);
-    updateStatus('Loading...');
+    updateStatus('⏳ Loading...');
     return fetch('http://' + window.location.hostname + ':8080/api/chat/' + encodeURIComponent(phone))
         .then(r => {
             console.log('Response status:', r.status);
@@ -314,12 +577,12 @@ function loadChat(phone) {
             console.log('Loaded', data.length, 'messages');
             chats[phone] = data;
             localStorage.setItem('anms_chats', JSON.stringify(chats));
-            updateStatus('Ready');
+            updateStatus('✓ Ready');
             return data;
         })
         .catch(e => {
             console.error('Load error:', e);
-            updateStatus('Error loading');
+            updateStatus('✗ Error loading');
         });
 }
 
@@ -337,14 +600,14 @@ function startPolling() {
 }
 
 function send() {
-    if (!active) { alert('Select contact'); return; }
+    if (!active) { alert('Select a contact'); return; }
     const text = document.getElementById('msg').value.trim();
     if (!text) return;
     
     console.log('Sending to:', active);
     document.getElementById('sendBtn').disabled = true;
     document.getElementById('msg').value = '';
-    updateStatus('Sending...');
+    updateStatus('⏳ Sending...');
     
     fetch('http://' + window.location.hostname + ':8080/send', {
         method: 'POST',
@@ -355,15 +618,15 @@ function send() {
         console.log('Send response:', data);
         document.getElementById('sendBtn').disabled = false;
         if (data.success) {
-            updateStatus('Sent');
+            updateStatus('✓ Sent');
             setTimeout(() => loadChat(active).then(() => renderMsgs()), 1000);
         } else {
-            updateStatus('Send failed: ' + data.message);
+            updateStatus('✗ Send failed: ' + data.message);
         }
     })
     .catch(e => {
         console.error('Send error:', e);
-        updateStatus('Error');
+        updateStatus('✗ Error');
         document.getElementById('sendBtn').disabled = false;
     });
 }
@@ -371,19 +634,28 @@ function send() {
 function renderContacts() {
     const html = contacts.map(p => {
         const cnt = (chats[p] || []).length;
-        return '<div class="contact ' + (active === p ? 'active' : '') + '" onclick="selectContact(\'' + p.replace(/'/g, "\\\"") + '\')\'>' + p + ' (' + cnt + ')</div>';
+        const cls = active === p ? 'active' : '';
+        return '<div class="contact-item ' + cls + '" onclick="selectContact(\'' + p.replace(/'/g, "\\\\'") + '\')\'><div class="contact-number">' + escapeHtml(p) + '</div><div class="contact-count">' + cnt + ' messages</div></div>';
     }).join('');
-    document.getElementById('contacts').innerHTML = html || '<div style="color: #666;">No contacts</div>';
+    document.getElementById('contacts').innerHTML = html || '<div style="color: #666; text-align: center; padding: 20px; font-size: 13px;">No contacts yet</div>';
 }
 
 function renderMsgs() {
     const msgs = chats[active] || [];
-    const html = msgs.map(m => 
-        '<div><div class="msg ' + m.dir + '">' + escapeHtml(m.body) + '</div><div class="msg time">' + m.time + '</div></div>'
-    ).join('');
-    const c = document.getElementById('messages');
-    c.innerHTML = html || '<div style="color: #666; text-align: center; margin-top: 20px;">No messages</div>';
-    c.scrollTop = c.scrollHeight;
+    if (!msgs.length) {
+        document.getElementById('messages').innerHTML = '<div class="empty-state">No messages yet</div>';
+        return;
+    }
+    
+    const html = msgs.map(m => {
+        const dirClass = m.dir === 'in' ? 'in' : 'out';
+        const sender = m.dir === 'in' ? 'target' : 'you';
+        return '<div class="message-group ' + dirClass + '"><div><div class="message-bubble">' + escapeHtml(m.body) + '</div><div class="message-time">' + m.time + '</div></div></div>';
+    }).join('');
+    
+    const area = document.getElementById('messages');
+    area.innerHTML = html;
+    area.scrollTop = area.scrollHeight;
 }
 
 function updateStatus(s) {
