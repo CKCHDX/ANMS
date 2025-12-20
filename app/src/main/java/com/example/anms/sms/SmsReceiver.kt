@@ -6,9 +6,7 @@ import android.content.Intent
 import android.provider.Telephony
 import android.util.Log
 import com.example.anms.network.WebSocketServer
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlin.concurrent.thread
 
 class SmsReceiver : BroadcastReceiver() {
     private val tag = "ANMS_SmsReceiver"
@@ -25,7 +23,7 @@ class SmsReceiver : BroadcastReceiver() {
                 Log.d(tag, "SMS from $phoneNumber: $messageText")
                 
                 // Broadcast to connected WebSocket clients
-                CoroutineScope(Dispatchers.IO).launch {
+                thread {
                     wsServer?.broadcastIncomingSMS(phoneNumber, messageText)
                 }
             }
