@@ -898,7 +898,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
 let ws, active, chats = {}, contacts = [], pollInterval, screenWidth = window.innerWidth;
 let deviceMode = 'desktop'; // 'desktop', 'tablet', 'phone', 'keitai'
 let messageState = {}; // Track pagination state per contact: { phone: { total, offset, limit, loading } }
-const MESSAGES_PER_LOAD = 50;
+const MESSAGES_PER_LOAD = 8;
 
 function detectScreenSize() {
     screenWidth = window.innerWidth;
@@ -1080,6 +1080,12 @@ function loadOlderMessages() {
         });
 }
 
+function isScrolledToBottom() {
+    const area = document.getElementById('messages');
+    // Check if user is within 50px of the bottom
+    return area.scrollHeight - area.scrollTop - area.clientHeight < 50;
+}
+
 function startPolling() {
     console.log('Started polling for:', active);
     pollInterval = setInterval(() => {
@@ -1087,10 +1093,11 @@ function startPolling() {
             loadChat(active).then(() => {
                 const msgCount = (chats[active] || []).length;
                 console.log('Poll update: ' + msgCount + ' messages');
-                renderMsgs();
+                // Only scroll to bottom if user was already at bottom
+                renderMsgs(isScrolledToBottom());
             }).catch(e => console.error('Poll error:', e));
         }
-    }, 2000);
+    }, 1000);
 }
 
 function send() {
@@ -1113,7 +1120,7 @@ function send() {
         document.getElementById('sendBtn').disabled = false;
         if (data.success) {
             updateStatus('✓ Sent');
-            setTimeout(() => loadChat(active).then(() => renderMsgs()), 1000);
+            setTimeout(() => loadChat(active).then(() => renderMsgs(true)), 1000);
         } else {
             updateStatus('✗ Send failed: ' + data.message);
         }
@@ -1134,7 +1141,7 @@ function renderContacts() {
     document.getElementById('contacts').innerHTML = html || '<div style="color: #666; text-align: center; padding: 20px; font-size: 12px;">No contacts yet</div>';
 }
 
-function renderMsgs() {
+function renderMsgs(shouldScroll = false) {
     const msgs = chats[active] || [];
     if (!msgs.length) {
         document.getElementById('messages').innerHTML = '<div class="empty-state">No messages yet</div>';
@@ -1146,7 +1153,7 @@ function renderMsgs() {
     
     // Show "Load older" button if there are more messages
     if (state.offset < state.total) {
-        html += '<button id="loadOlderBtn" class="load-older-btn" onclick="loadOlderMessages()">↑ Load older messages</button>';
+        html += '<button id="loadOlderBtn" class="load-older-btn" onclick="loadOlderMessages()">\u2191 Load older messages</button>';
     }
     
     html += msgs.map(m => {
@@ -1156,7 +1163,11 @@ function renderMsgs() {
     
     const area = document.getElementById('messages');
     area.innerHTML = html;
-    area.scrollTop = area.scrollHeight;
+    
+    // Only auto-scroll if user was at bottom or explicitly requested
+    if (shouldScroll) {
+        area.scrollTop = area.scrollHeight;
+    }
 }
 
 function updateStatus(s) {
