@@ -185,7 +185,6 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             overflow: hidden;
         }
         
-        /* Desktop/Tablet Layout (>600px) */
         @media (min-width: 600px) {
             .app {
                 gap: 0;
@@ -211,7 +210,6 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             }
         }
         
-        /* Mobile Layout (<600px) */
         @media (max-width: 600px) {
             .app {
                 flex-direction: column;
@@ -243,7 +241,6 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             }
         }
         
-        /* Sidebar Styles */
         .sidebar {
             display: none;
             flex-direction: column;
@@ -338,7 +335,6 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             opacity: 0.7;
         }
         
-        /* Contacts Screen (Mobile) */
         .contacts-screen {
             display: none;
             flex-direction: column;
@@ -354,43 +350,6 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             text-align: center;
         }
         
-        .phone-input-group {
-            display: flex;
-            gap: 8px;
-        }
-        
-        .contacts-screen .phone-input-group input {
-            flex: 1;
-            padding: 12px;
-            background: #252525;
-            border: 1px solid #404040;
-            border-radius: 8px;
-            color: #e0e0e0;
-            font-size: 14px;
-        }
-        
-        .contacts-screen .phone-input-group button {
-            padding: 12px 24px;
-            background: #4a9eff;
-            border: none;
-            border-radius: 8px;
-            color: #fff;
-            font-weight: 600;
-            font-size: 14px;
-        }
-        
-        .contacts-screen .contacts-list {
-            flex: 1;
-            gap: 8px;
-        }
-        
-        .contacts-screen .contact-item {
-            padding: 16px;
-            font-size: 14px;
-            border-radius: 8px;
-        }
-        
-        /* Chat Section */
         .chat-section {
             display: none;
             flex-direction: column;
@@ -637,9 +596,8 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
 </head>
 <body>
 <div class="app">
-    <!-- Desktop Sidebar -->
     <div class="sidebar">
-        <div class="sidebar-header">📱 Chats</div>
+        <div class="sidebar-header">Phone Chats</div>
         <div class="phone-input-group">
             <input type="tel" id="phone" placeholder="+1234567890" maxlength="20">
             <button onclick="addContact()">Add</button>
@@ -647,9 +605,8 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
         <div class="contacts-list" id="contacts"></div>
     </div>
     
-    <!-- Mobile Contacts Screen -->
     <div class="contacts-screen" id="contactsScreen">
-        <div class="contacts-screen-header">📱 SMS Chat</div>
+        <div class="contacts-screen-header">SMS Chat</div>
         <div class="phone-input-group">
             <input type="tel" id="phoneMobile" placeholder="+1234567890" maxlength="20">
             <button onclick="addContact()">Add</button>
@@ -657,18 +614,17 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
         <div class="contacts-list" id="contactsMobile"></div>
     </div>
     
-    <!-- Chat Section -->
     <div class="chat-section" id="chatSection">
         <div class="chat-header">
-            <button class="back-btn" onclick="goBack()">← Back</button>
+            <button class="back-btn" onclick="goBack()">Back</button>
             <span id="chatHeader">Select contact</span>
         </div>
-        <div class="messages-area" id="messages"><div class="empty-state">👈 Select a contact to start</div></div>
+        <div class="messages-area" id="messages"><div class="empty-state">Select a contact</div></div>
         <div class="input-section">
             <textarea id="msg" placeholder="Type..." disabled></textarea>
             <button onclick="send()" id="sendBtn" disabled>Send</button>
         </div>
-        <div class="status-bar" id="status">✓ Ready</div>
+        <div class="status-bar" id="status">Ready</div>
     </div>
 </div>
 
@@ -681,38 +637,39 @@ function init() {
     chats = JSON.parse(localStorage.getItem('anms_chats') || '{}');
     renderContacts();
     connectWS();
-    window.addEventListener('resize', () => {
+    window.addEventListener('resize', function() {
         isMobile = window.innerWidth <= 600;
     });
 }
 
 function connectWS() {
-    const host = window.location.hostname;
+    var host = window.location.hostname;
     try {
         ws = new WebSocket('ws://' + host + ':8765');
-        ws.onopen = () => updateStatus('✓ Connected');
-        ws.onmessage = e => {
-            if (e.data.startsWith('INCOMING_SMS|')) {
-                const [_, phone, ...msgParts] = e.data.split('|');
-                const text = msgParts.join('|');
-                loadChat(phone).then(() => {
+        ws.onopen = function() { updateStatus('Connected'); };
+        ws.onmessage = function(e) {
+            if (e.data.indexOf('INCOMING_SMS|') === 0) {
+                var parts = e.data.split('|');
+                var phone = parts[1];
+                var text = parts.slice(2).join('|');
+                loadChat(phone).then(function() {
                     if (active === phone) renderMsgs();
                 });
             }
         };
-        ws.onclose = () => { updateStatus('⚠ Reconnecting...'); setTimeout(connectWS, 3000); };
-        ws.onerror = (e) => { console.error('WS Error:', e); updateStatus('✗ Error'); };
+        ws.onclose = function() { updateStatus('Reconnecting...'); setTimeout(connectWS, 3000); };
+        ws.onerror = function(e) { console.error('WS Error:', e); updateStatus('Error'); };
     } catch (e) {
         console.error('WS Connect Error:', e);
-        updateStatus('✗ WS Error');
+        updateStatus('WS Error');
     }
 }
 
 function addContact() {
-    const input = isMobile ? document.getElementById('phoneMobile') : document.getElementById('phone');
-    const p = input.value.trim();
+    var input = isMobile ? document.getElementById('phoneMobile') : document.getElementById('phone');
+    var p = input.value.trim();
     if (!p) { alert('Enter phone'); return; }
-    if (contacts.includes(p)) { alert('Already added'); return; }
+    if (contacts.indexOf(p) >= 0) { alert('Already added'); return; }
     contacts.push(p);
     localStorage.setItem('anms_contacts', JSON.stringify(contacts));
     input.value = '';
@@ -721,11 +678,10 @@ function addContact() {
 }
 
 function renderContacts() {
-    const html = contacts.map(p => {
-        const cnt = (chats[p] || []).length;
-        const cls = active === p ? 'active' : '';
-        const onclick = isMobile ? `selectContactMobile('${p.replace(/'/g, "\\\\'")}'` : `selectContact('${p.replace(/'/g, "\\\\'")}'`;
-        return '<div class="contact-item ' + cls + '" onclick="' + onclick + '\'><div class="contact-number">' + escapeHtml(p) + '</div><div class="contact-count">' + cnt + ' msgs</div></div>';
+    var html = contacts.map(function(p) {
+        var cnt = (chats[p] || []).length;
+        var cls = active === p ? 'active' : '';
+        return '<div class="contact-item ' + cls + '" onclick="selectContactMobile(' + JSON.stringify(p) + ')"><div class="contact-number">' + escapeHtml(p) + '</div><div class="contact-count">' + cnt + ' msgs</div></div>';
     }).join('');
     
     document.getElementById('contacts').innerHTML = html || '<div style="color: #666; text-align: center; padding: 20px; font-size: 13px;">No contacts</div>';
@@ -733,30 +689,28 @@ function renderContacts() {
 }
 
 function selectContact(p) {
-    console.log('Desktop: selecting', p);
     active = p;
     renderContacts();
     document.getElementById('msg').disabled = false;
     document.getElementById('sendBtn').disabled = false;
-    document.getElementById('chatHeader').textContent = '📱 ' + p;
+    document.getElementById('chatHeader').textContent = 'Chat: ' + p;
     clearInterval(pollInterval);
-    loadChat(p).then(() => {
+    loadChat(p).then(function() {
         renderMsgs();
         startPolling();
     });
 }
 
 function selectContactMobile(p) {
-    console.log('Mobile: selecting', p);
     active = p;
     renderContacts();
     document.getElementById('contactsScreen').classList.add('hidden');
     document.getElementById('chatSection').classList.add('mobile-view');
     document.getElementById('msg').disabled = false;
     document.getElementById('sendBtn').disabled = false;
-    document.getElementById('chatHeader').textContent = '📱 ' + p;
+    document.getElementById('chatHeader').textContent = 'Chat: ' + p;
     clearInterval(pollInterval);
-    loadChat(p).then(() => {
+    loadChat(p).then(function() {
         renderMsgs();
         startPolling();
     });
@@ -773,75 +727,75 @@ function goBack() {
 }
 
 function loadChat(phone) {
-    updateStatus('⏳ Loading...');
+    updateStatus('Loading...');
     return fetch('http://' + window.location.hostname + ':8080/api/chat/' + encodeURIComponent(phone))
-        .then(r => {
+        .then(function(r) {
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.json();
         })
-        .then(data => {
+        .then(function(data) {
             chats[phone] = data;
             localStorage.setItem('anms_chats', JSON.stringify(chats));
-            updateStatus('✓ Ready');
+            updateStatus('Ready');
             return data;
         })
-        .catch(e => {
+        .catch(function(e) {
             console.error('Load error:', e);
-            updateStatus('✗ Error');
+            updateStatus('Error');
         });
 }
 
 function startPolling() {
-    pollInterval = setInterval(() => {
+    pollInterval = setInterval(function() {
         if (active) {
-            loadChat(active).then(() => renderMsgs()).catch(e => console.error('Poll error:', e));
+            loadChat(active).then(function() { renderMsgs(); }).catch(function(e) { console.error('Poll error:', e); });
         }
     }, 2000);
 }
 
 function send() {
     if (!active) return;
-    const text = document.getElementById('msg').value.trim();
+    var text = document.getElementById('msg').value.trim();
     if (!text) return;
     
     document.getElementById('sendBtn').disabled = true;
     document.getElementById('msg').value = '';
-    updateStatus('⏳ Sending...');
+    updateStatus('Sending...');
     
     fetch('http://' + window.location.hostname + ':8080/send', {
         method: 'POST',
         body: 'phone=' + encodeURIComponent(active) + '&message=' + encodeURIComponent(text)
     })
-    .then(r => r.json())
-    .then(data => {
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
         document.getElementById('sendBtn').disabled = false;
         if (data.success) {
-            updateStatus('✓ Sent');
-            setTimeout(() => loadChat(active).then(() => renderMsgs()), 1000);
+            updateStatus('Sent');
+            setTimeout(function() { loadChat(active).then(function() { renderMsgs(); }); }, 1000);
         } else {
-            updateStatus('✗ Failed');
+            updateStatus('Failed');
         }
     })
-    .catch(e => {
+    .catch(function(e) {
         console.error('Send error:', e);
-        updateStatus('✗ Error');
+        updateStatus('Error');
         document.getElementById('sendBtn').disabled = false;
     });
 }
 
 function renderMsgs() {
-    const msgs = chats[active] || [];
+    var msgs = chats[active] || [];
     if (!msgs.length) {
         document.getElementById('messages').innerHTML = '<div class="empty-state">No messages yet</div>';
         return;
     }
     
-    const html = msgs.map(m => {
-        const dirClass = m.dir === 'in' ? 'in' : 'out';
+    var html = msgs.map(function(m) {
+        var dirClass = m.dir === 'in' ? 'in' : 'out';
         return '<div class="message-group ' + dirClass + '"><div><div class="message-bubble">' + escapeHtml(m.body) + '</div><div class="message-time">' + m.time + '</div></div></div>';
     }).join('');
     
-    const area = document.getElementById('messages');
+    var area = document.getElementById('messages');
     area.innerHTML = html;
     area.scrollTop = area.scrollHeight;
 }
@@ -851,21 +805,22 @@ function updateStatus(s) {
 }
 
 function escapeHtml(text) {
-    const div = document.createElement('div');
+    var div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
 }
 
-document.getElementById('msg').addEventListener('keypress', e => {
+document.getElementById('msg').addEventListener('keypress', function(e) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
 });
 
-document.getElementById('phone').addEventListener('keypress', e => {
+document.getElementById('phone').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') addContact();
 });
 
-if (document.getElementById('phoneMobile')) {
-    document.getElementById('phoneMobile').addEventListener('keypress', e => {
+var phoneMobile = document.getElementById('phoneMobile');
+if (phoneMobile) {
+    phoneMobile.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') addContact();
     });
 }
