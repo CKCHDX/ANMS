@@ -179,10 +179,16 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             font-size: 14px;
         }
         
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+        
         .main {
             display: flex;
             height: 100vh;
             gap: 0;
+            flex: 1;
         }
         
         .sidebar {
@@ -296,6 +302,26 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             font-weight: 600;
             font-size: 15px;
             color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .chat-header-back {
+            display: none;
+            background: #4a9eff;
+            border: none;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        
+        .chat-header-back:active {
+            transform: scale(0.95);
         }
         
         .messages-area {
@@ -461,6 +487,29 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             background: #505050;
         }
         
+        /* ==================== TABLET (768px - 1024px) ==================== */
+        @media (max-width: 1024px) {
+            .sidebar {
+                width: 240px;
+                padding: 12px;
+            }
+            
+            .chat-header {
+                padding: 12px;
+                font-size: 14px;
+            }
+            
+            .messages-area {
+                padding: 12px;
+            }
+            
+            .message-bubble {
+                max-width: 75%;
+                font-size: 13px;
+            }
+        }
+        
+        /* ==================== PHONE (480px - 768px) ==================== */
         @media (max-width: 768px) {
             .main {
                 flex-direction: column;
@@ -468,37 +517,261 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             
             .sidebar {
                 width: 100%;
-                max-height: 35%;
+                max-height: 40%;
                 border-right: none;
                 border-bottom: 1px solid #333;
+                padding: 12px;
             }
             
             .chat-container {
-                min-height: 65%;
+                min-height: 60%;
+                flex: 1;
             }
             
             .message-bubble {
-                max-width: 80%;
+                max-width: 85%;
+                font-size: 13px;
+            }
+            
+            .input-section {
+                padding: 12px;
+                gap: 8px;
+            }
+            
+            .input-section textarea {
+                font-size: 13px;
+                min-height: 36px;
+            }
+            
+            .input-section button {
+                padding: 8px 16px;
+                font-size: 12px;
+            }
+            
+            .phone-input-group {
+                gap: 6px;
+            }
+            
+            .phone-input-group input,
+            .phone-input-group button {
+                padding: 8px 10px;
+                font-size: 12px;
+            }
+        }
+        
+        /* ==================== MINI PHONE / KEITAI (<480px, typically <3 inch) ==================== */
+        @media (max-width: 480px) {
+            body {
+                background: #0f0f0f;
+            }
+            
+            .main {
+                flex-direction: column;
+                height: auto;
+            }
+            
+            /* Hide sidebar by default, show only in contact selection mode */
+            .sidebar {
+                width: 100%;
+                max-height: none;
+                border: none;
+                padding: 8px;
+                gap: 8px;
+            }
+            
+            .sidebar.hidden {
+                display: none;
+            }
+            
+            .sidebar-header {
+                font-size: 14px;
+                font-weight: 600;
+            }
+            
+            .phone-input-group {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 6px;
+                width: 100%;
+            }
+            
+            .phone-input-group input {
+                padding: 10px 8px;
+                font-size: 12px;
+                border-radius: 4px;
+            }
+            
+            .phone-input-group button {
+                padding: 10px 8px;
+                font-size: 12px;
+                border-radius: 4px;
+                width: 100%;
+            }
+            
+            .contacts-list {
+                flex: none;
+                max-height: 300px;
+                gap: 4px;
+                padding-bottom: 8px;
+            }
+            
+            .contact-item {
+                padding: 10px;
+                font-size: 12px;
+                border-radius: 6px;
+            }
+            
+            .contact-number {
+                margin-bottom: 2px;
+                font-weight: 600;
+                font-size: 13px;
+            }
+            
+            .contact-count {
+                font-size: 11px;
+            }
+            
+            /* Chat takes full screen on keitai */
+            .chat-container {
+                width: 100%;
+                height: 100vh;
+                min-height: 100vh;
+                flex: none;
+                border: none;
+            }
+            
+            .chat-container.hidden {
+                display: none;
+            }
+            
+            .chat-header {
+                padding: 10px 8px;
+                font-size: 13px;
+                font-weight: 600;
+                gap: 8px;
+            }
+            
+            .chat-header-back {
+                display: block;
+                padding: 6px 10px;
+                font-size: 11px;
+                flex-shrink: 0;
+            }
+            
+            .chat-header-title {
+                flex: 1;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            
+            .messages-area {
+                padding: 8px;
+                gap: 6px;
+                font-size: 12px;
+            }
+            
+            .message-bubble {
+                max-width: 90%;
+                padding: 8px 10px;
+                font-size: 12px;
+                border-radius: 8px;
+                word-break: break-word;
+                line-height: 1.3;
+            }
+            
+            .message-time {
+                font-size: 10px;
+                margin-top: 2px;
+            }
+            
+            .input-section {
+                padding: 8px;
+                gap: 6px;
+                border-top: 1px solid #333;
+            }
+            
+            .input-section textarea {
+                padding: 8px;
+                font-size: 12px;
+                min-height: 32px;
+                max-height: 60px;
+                border-radius: 4px;
+            }
+            
+            .input-section button {
+                padding: 8px 12px;
+                font-size: 11px;
+                border-radius: 4px;
+                font-weight: 600;
+            }
+            
+            .status-bar {
+                padding: 6px 8px;
+                font-size: 11px;
+            }
+            
+            .empty-state {
+                font-size: 12px;
+            }
+        }
+        
+        /* ==================== ULTRA-SMALL (<320px) ==================== */
+        @media (max-width: 320px) {
+            .chat-header {
+                padding: 8px;
+            }
+            
+            .chat-header-back {
+                padding: 6px 8px;
+                font-size: 10px;
+            }
+            
+            .messages-area {
+                padding: 6px;
+            }
+            
+            .message-bubble {
+                padding: 6px 8px;
+                font-size: 11px;
+            }
+            
+            .input-section {
+                padding: 6px;
+            }
+            
+            .input-section textarea {
+                min-height: 28px;
+                font-size: 11px;
+                padding: 6px;
+            }
+            
+            .input-section button {
+                padding: 6px 10px;
+                font-size: 10px;
             }
         }
     </style>
 </head>
 <body>
 <div class="main">
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
         <div class="sidebar-header">📱 Chats</div>
         <div class="phone-input-group">
-            <input type="tel" id="phone" placeholder="+1234567890" maxlength="20">
+            <input type="tel" id="phone" placeholder="Phone number" maxlength="20">
             <button onclick="addContact()">Add</button>
         </div>
         <div class="contacts-list" id="contacts"></div>
     </div>
     
-    <div class="chat-container">
-        <div class="chat-header" id="chatHeader">Select a contact</div>
+    <div class="chat-container" id="chatContainer">
+        <div class="chat-header">
+            <button class="chat-header-back" id="backBtn" onclick="goBack()">← Back</button>
+            <div class="chat-header-title" id="chatHeader">Select a contact</div>
+        </div>
         <div class="messages-area" id="messages"><div class="empty-state">👈 Select a contact to start chatting</div></div>
         <div class="input-section">
-            <textarea id="msg" placeholder="Type a message..." disabled></textarea>
+            <textarea id="msg" placeholder="Type message..." disabled></textarea>
             <button onclick="send()" id="sendBtn" disabled>Send</button>
         </div>
         <div class="status-bar" id="status">✓ Ready</div>
@@ -506,13 +779,67 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
 </div>
 
 <script>
-let ws, active, chats = {}, contacts = [], pollInterval;
+let ws, active, chats = {}, contacts = [], pollInterval, screenWidth = window.innerWidth;
+
+function detectScreenSize() {
+    screenWidth = window.innerWidth;
+    console.log('Screen width:', screenWidth);
+    
+    // Keitai mode: <480px
+    if (screenWidth < 480) {
+        document.documentElement.setAttribute('data-mode', 'keitai');
+    } else if (screenWidth < 768) {
+        document.documentElement.setAttribute('data-mode', 'phone');
+    } else if (screenWidth < 1024) {
+        document.documentElement.setAttribute('data-mode', 'tablet');
+    } else {
+        document.documentElement.setAttribute('data-mode', 'desktop');
+    }
+}
 
 function init() {
+    detectScreenSize();
+    window.addEventListener('resize', () => {
+        detectScreenSize();
+        if (screenWidth >= 480 && active) {
+            document.getElementById('sidebar').classList.remove('hidden');
+            document.getElementById('chatContainer').classList.remove('hidden');
+        }
+    });
+    
     contacts = JSON.parse(localStorage.getItem('anms_contacts') || '[]');
     chats = JSON.parse(localStorage.getItem('anms_chats') || '{}');
     renderContacts();
+    
+    if (screenWidth < 480 && contacts.length > 0) {
+        showContactSelectionScreen();
+    }
+    
     connectWS();
+}
+
+function showContactSelectionScreen() {
+    if (screenWidth < 480) {
+        document.getElementById('sidebar').classList.remove('hidden');
+        document.getElementById('chatContainer').classList.add('hidden');
+    }
+}
+
+function showChatScreen() {
+    if (screenWidth < 480) {
+        document.getElementById('sidebar').classList.add('hidden');
+        document.getElementById('chatContainer').classList.remove('hidden');
+    }
+}
+
+function goBack() {
+    active = null;
+    document.getElementById('msg').disabled = true;
+    document.getElementById('sendBtn').disabled = true;
+    document.getElementById('messages').innerHTML = '<div class="empty-state">👈 Select a contact to start chatting</div>';
+    clearInterval(pollInterval);
+    showContactSelectionScreen();
+    renderContacts();
 }
 
 function connectWS() {
@@ -558,6 +885,11 @@ function selectContact(p) {
     document.getElementById('sendBtn').disabled = false;
     document.getElementById('chatHeader').textContent = '📱 ' + p;
     clearInterval(pollInterval);
+    
+    if (screenWidth < 480) {
+        showChatScreen();
+    }
+    
     loadChat(p).then(() => {
         renderMsgs();
         startPolling();
@@ -635,9 +967,9 @@ function renderContacts() {
     const html = contacts.map(p => {
         const cnt = (chats[p] || []).length;
         const cls = active === p ? 'active' : '';
-        return '<div class="contact-item ' + cls + '" onclick="selectContact(\'' + p.replace(/'/g, "\\\\'") + '\')\'><div class="contact-number">' + escapeHtml(p) + '</div><div class="contact-count">' + cnt + ' messages</div></div>';
+        return '<div class="contact-item ' + cls + '" onclick="selectContact(\'' + p.replace(/'/g, "\\\\'") + '\')"><div class="contact-number">' + escapeHtml(p) + '</div><div class="contact-count">' + cnt + ' messages</div></div>';
     }).join('');
-    document.getElementById('contacts').innerHTML = html || '<div style="color: #666; text-align: center; padding: 20px; font-size: 13px;">No contacts yet</div>';
+    document.getElementById('contacts').innerHTML = html || '<div style="color: #666; text-align: center; padding: 20px; font-size: 12px;">No contacts yet</div>';
 }
 
 function renderMsgs() {
@@ -649,7 +981,6 @@ function renderMsgs() {
     
     const html = msgs.map(m => {
         const dirClass = m.dir === 'in' ? 'in' : 'out';
-        const sender = m.dir === 'in' ? 'target' : 'you';
         return '<div class="message-group ' + dirClass + '"><div><div class="message-bubble">' + escapeHtml(m.body) + '</div><div class="message-time">' + m.time + '</div></div></div>';
     }).join('');
     
