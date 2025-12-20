@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
@@ -60,6 +61,7 @@ class SMSListenerService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             registerReceiver(smsReceiver, intentFilter, Context.RECEIVER_EXPORTED)
         } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
             registerReceiver(smsReceiver, intentFilter)
         }
         
