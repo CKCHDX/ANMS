@@ -63,7 +63,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             }
 
             val response = when {
-                path == "/" -> sendHtmlResponse(getHtml(clientSocket.inetAddress.hostAddress))
+                path == "/" -> sendHtmlResponse(getHtml())
                 path.startsWith("/send") && method == "POST" -> {
                     val body = if (contentLength > 0) {
                         val chars = CharArray(contentLength)
@@ -138,10 +138,147 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
         return "HTTP/1.1 404 Not Found\r\nContent-Length: ${body.length}\r\nConnection: close\r\n\r\n$body"
     }
 
-    private fun getHtml(serverIp: String): String {
-        val js = """let ws=null;const STATE={phone:null,chats:{},contacts:[],serverIp:'$serverIp'};const DOM={newPhone:document.getElementById('newPhone'),contactsList:document.getElementById('contactsList'),phoneDisplay:document.getElementById('phoneDisplay'),messages:document.getElementById('messages'),messageInput:document.getElementById('messageInput'),sendBtn:document.getElementById('sendBtn')};function connectWebSocket(){try{ws=new WebSocket('ws://'+STATE.serverIp+':8765');ws.onopen=()=>{console.log('WebSocket connected')};ws.onmessage=e=>{console.log('WebSocket message:',e.data);if(e.data.startsWith('INCOMING_SMS|')){const parts=e.data.split('|');const phone=parts[1];const msg=parts.slice(2).join('|');addMessage(phone,msg,'in')}};ws.onerror=err=>{console.error('WebSocket error:',err)};ws.onclose=()=>{console.log('WebSocket closed');setTimeout(connectWebSocket,3000)}}catch(e){console.error('WebSocket connect error:',e)}}function addContact(){const phone=DOM.newPhone.value.trim();if(!phone||STATE.contacts.includes(phone))return;STATE.contacts.push(phone);STATE.chats[phone]=[];DOM.newPhone.value='';renderContacts();selectContact(phone)}function selectContact(phone){STATE.phone=phone;DOM.phoneDisplay.textContent='Chat: '+phone;DOM.messageInput.disabled=false;DOM.sendBtn.disabled=false;renderMessages();DOM.messageInput.focus()}function addMessage(phone,text,direction){const time=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});if(!STATE.chats[phone])STATE.chats[phone]=[];STATE.chats[phone].push({text,direction,time});if(STATE.phone===phone)renderMessages();renderContacts()}async function sendMessage(){if(!STATE.phone)return;const text=DOM.messageInput.value.trim();if(!text)return;DOM.sendBtn.disabled=true;DOM.messageInput.value='';addMessage(STATE.phone,text,'out');try{const response=await fetch('http://'+STATE.serverIp+':8080/send',{method:'POST',body:'phone='+encodeURIComponent(STATE.phone)+'&message='+encodeURIComponent(text)});const data=await response.json();if(!data.success){addMessage(STATE.phone,'Failed: '+data.message,'error')}}catch(e){addMessage(STATE.phone,'Network error','error')}finally{DOM.sendBtn.disabled=false;DOM.messageInput.focus()}}function renderContacts(){DOM.contactsList.innerHTML=STATE.contacts.map(p=>{const lastMsg=STATE.chats[p]&&STATE.chats[p].length>0?STATE.chats[p][STATE.chats[p].length-1].text:'No messages';return'<div class="contact-tag '+(STATE.phone===p?'active':'')+' onclick="selectContact(\''+p+'\'')" title="'+lastMsg+'">'+p+'</div>'}).join('')}function renderMessages(){if(!STATE.phone){DOM.messages.innerHTML='<div class="empty-state">Select a contact to start chatting</div>';return}const msgs=STATE.chats[STATE.phone]||[];if(msgs.length===0){DOM.messages.innerHTML='<div class="empty-state">No messages yet. Type a message to send SMS!</div>';return}DOM.messages.innerHTML=msgs.map(m=>'<div class="msg '+m.direction+'"><div><div class="msg-bubble">'+escapeHtml(m.text)+'</div><div class="msg-time">'+m.time+'</div></div></div>').join('');DOM.messages.scrollTop=DOM.messages.scrollHeight}function escapeHtml(text){return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}DOM.messageInput.onkeypress=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage()}};DOM.newPhone.onkeypress=e=>{if(e.key==='Enter')addContact()};connectWebSocket();renderContacts();renderMessages();"""
-        
-        return """<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>ANMS Chat</title><style>* { margin: 0; padding: 0; box-sizing: border-box; } body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); height: 100vh; display: flex; align-items: center; justify-content: center; } .app { width: 100%; max-width: 500px; height: 100vh; max-height: 800px; background: white; border-radius: 20px; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; } .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); } .header h1 { font-size: 24px; margin-bottom: 4px; } .header p { font-size: 14px; opacity: 0.9; } .contacts-section { padding: 16px; border-bottom: 1px solid #eee; } .input-group { display: flex; gap: 8px; margin-bottom: 12px; } .input-group input { flex: 1; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 14px; transition: border-color 0.3s; } .input-group input:focus { outline: none; border-color: #667eea; } .input-group button { padding: 12px 20px; background: #667eea; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; transition: all 0.3s; } .input-group button:hover { background: #5568d3; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); } .contacts-list { max-height: 120px; overflow-y: auto; display: flex; gap: 8px; flex-wrap: wrap; } .contact-tag { background: #f0f0f0; padding: 8px 12px; border-radius: 20px; font-size: 12px; cursor: pointer; transition: all 0.3s; border: 2px solid transparent; } .contact-tag:hover { background: #e0e0e0; } .contact-tag.active { background: #667eea; color: white; border-color: #667eea; } .chat-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; } .phone-display { background: #f5f5f5; padding: 16px; text-align: center; font-weight: 600; color: #333; border-bottom: 1px solid #eee; font-size: 16px; } .messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; } .msg { display: flex; gap: 8px; animation: slideIn 0.3s ease; } @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } } .msg.out { justify-content: flex-end; } .msg.in { justify-content: flex-start; } .msg-bubble { max-width: 70%; padding: 12px 16px; border-radius: 16px; font-size: 14px; word-wrap: break-word; line-height: 1.4; } .msg.in .msg-bubble { background: #e3f2fd; color: #1565c0; } .msg.out .msg-bubble { background: #667eea; color: white; } .msg-time { font-size: 11px; color: #999; margin-top: 4px; align-self: flex-end; } .input-area { padding: 16px; border-top: 1px solid #eee; display: flex; gap: 8px; background: #fafafa; } .input-area textarea { flex: 1; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 10px; font-family: inherit; font-size: 14px; resize: none; height: 40px; transition: border-color 0.3s; } .input-area textarea:focus { outline: none; border-color: #667eea; } .input-area button { padding: 12px 20px; background: #667eea; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; transition: all 0.3s; min-width: 60px; } .input-area button:hover { background: #5568d3; transform: translateY(-2px); } .input-area button:disabled { background: #ccc; cursor: not-allowed; transform: none; } .empty-state { display: flex; align-items: center; justify-content: center; height: 100%; color: #999; font-size: 14px; }</style></head><body><div class="app"><div class="header"><h1>ANMS Chat</h1><p>Remote SMS Control</p></div><div class="contacts-section"><div class="input-group"><input type="tel" id="newPhone" placeholder="Enter phone number" maxlength="20"><button onclick="addContact()">Add</button></div><div class="contacts-list" id="contactsList"></div></div><div class="chat-area"><div class="phone-display" id="phoneDisplay">Select a contact to chat</div><div class="messages" id="messages"></div><div class="input-area"><textarea id="messageInput" placeholder="Type message..." disabled></textarea><button id="sendBtn" onclick="sendMessage()" disabled>Send</button></div></div></div><script>$js</script></body></html>"""
+    private fun getHtml(): String {
+        return """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>ANMS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: monospace; background: #000; color: #0f0; font-size: 14px; }
+        .container { max-width: 240px; margin: 0 auto; padding: 8px; }
+        .header { background: #003; padding: 8px; margin-bottom: 8px; border: 1px solid #006; text-align: center; }
+        .input-row { display: flex; gap: 4px; margin-bottom: 8px; }
+        .input-row input { flex: 1; padding: 6px; background: #001; border: 1px solid #003; color: #0f0; font-size: 12px; }
+        .btn { padding: 6px 12px; background: #006; color: #0f0; border: 1px solid #00f; cursor: pointer; font-size: 12px; font-weight: bold; }
+        .btn:active { background: #00f; }
+        .contacts { margin-bottom: 8px; padding: 6px; background: #001; border: 1px solid #003; max-height: 80px; overflow-y: auto; }
+        .contact { padding: 4px; cursor: pointer; border-bottom: 1px solid #003; font-size: 12px; }
+        .contact:hover { background: #002; }
+        .contact.active { background: #006; color: #0ff; }
+        .messages { height: 180px; background: #000; border: 1px solid #003; padding: 6px; overflow-y: auto; margin-bottom: 8px; display: flex; flex-direction: column; gap: 4px; }
+        .msg { padding: 4px; font-size: 12px; word-wrap: break-word; max-width: 100%; line-height: 1.3; }
+        .msg.in { background: #003; color: #0f0; }
+        .msg.out { background: #006; color: #0ff; text-align: right; }
+        .input-msg { display: flex; gap: 4px; }
+        .input-msg textarea { flex: 1; padding: 4px; background: #001; border: 1px solid #003; color: #0f0; font-size: 12px; font-family: monospace; height: 40px; resize: none; }
+        .status { font-size: 11px; color: #666; padding: 4px; text-align: center; border-top: 1px solid #003; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">ANMS CHAT</div>
+    
+    <div class="input-row">
+        <input type="tel" id="phone" placeholder="Phone #" maxlength="15">
+        <button class="btn" onclick="addContact()">Add</button>
+    </div>
+    
+    <div class="contacts" id="contacts"></div>
+    
+    <div class="messages" id="messages"></div>
+    
+    <div class="input-msg">
+        <textarea id="msg" placeholder="Message" disabled></textarea>
+        <button class="btn" onclick="send()" id="sendBtn" disabled>Send</button>
+    </div>
+    
+    <div class="status" id="status">Connecting...</div>
+</div>
+
+<script>
+let ws, activePhone, chats = {}, contacts = [];
+
+function initWS() {
+    const host = window.location.hostname;
+    ws = new WebSocket('ws://' + host + ':8765');
+    ws.onopen = () => updateStatus('Ready');
+    ws.onmessage = e => {
+        if (e.data.startsWith('INCOMING_SMS|')) {
+            const [_, phone, ...msgParts] = e.data.split('|');
+            const text = msgParts.join('|');
+            addMsg(phone, text, 'in');
+        }
+    };
+    ws.onclose = () => { updateStatus('Offline'); setTimeout(initWS, 3000); };
+    ws.onerror = () => updateStatus('Error');
+}
+
+function addContact() {
+    const p = document.getElementById('phone').value.trim();
+    if (!p || contacts.includes(p)) return;
+    contacts.push(p);
+    chats[p] = [];
+    document.getElementById('phone').value = '';
+    renderContacts();
+    selectContact(p);
+}
+
+function selectContact(p) {
+    activePhone = p;
+    renderContacts();
+    document.getElementById('msg').disabled = false;
+    document.getElementById('sendBtn').disabled = false;
+    renderMsgs();
+    document.getElementById('msg').focus();
+}
+
+function addMsg(phone, text, dir) {
+    if (!chats[phone]) chats[phone] = [];
+    chats[phone].push({ text, dir, time: new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}) });
+    if (activePhone === phone) renderMsgs();
+    renderContacts();
+}
+
+function send() {
+    if (!activePhone) return;
+    const text = document.getElementById('msg').value.trim();
+    if (!text) return;
+    
+    addMsg(activePhone, text, 'out');
+    document.getElementById('msg').value = '';
+    
+    fetch('http://' + window.location.hostname + ':8080/send', {
+        method: 'POST',
+        body: 'phone=' + encodeURIComponent(activePhone) + '&message=' + encodeURIComponent(text)
+    }).catch(e => addMsg(activePhone, 'Failed: ' + e, 'err'));
+}
+
+function renderContacts() {
+    const html = contacts.map(p => {
+        const last = chats[p].length > 0 ? chats[p][chats[p].length-1].text : '';
+        return '<div class="contact ' + (activePhone === p ? 'active' : '') + '" onclick="selectContact(\'' + p + '\')" title="' + last + '">' + p + '</div>';
+    }).join('');
+    document.getElementById('contacts').innerHTML = html;
+}
+
+function renderMsgs() {
+    const html = (chats[activePhone] || []).map(m => 
+        '<div class="msg ' + m.dir + '">' + m.text + '</div>'
+    ).join('');
+    const c = document.getElementById('messages');
+    c.innerHTML = html;
+    c.scrollTop = c.scrollHeight;
+}
+
+function updateStatus(s) {
+    document.getElementById('status').textContent = s;
+}
+
+document.getElementById('msg').addEventListener('keypress', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+});
+
+document.getElementById('phone').addEventListener('keypress', e => {
+    if (e.key === 'Enter') addContact();
+});
+
+initWS();
+</script>
+</body>
+</html>"""
     }
 
     fun stopServer() {
