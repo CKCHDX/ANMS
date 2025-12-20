@@ -98,11 +98,12 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             val allConvs = smsDb.getAllConversations(999)
             Log.d(tag, "Total conversations: ${allConvs.size}")
             
-            val convList = allConvs.map { (phone, msgs) ->
-                "\"{\\\"phone\\\":\\\"${phone.replace("\\", "\\\\").replace("\"", "\\\"")}\\\",\\\"count\\\":${msgs.size}}\"
-            }.joinToString(",")
+            val convItems = allConvs.map { (phone, msgs) ->
+                """{\"phone\":\"${phone.replace("\\", "\\\\").replace("\"", "\\\"")}\",\"count\":${msgs.size}}"""
+            }
+            val convList = convItems.joinToString(",")
             
-            val json = """{"total_conversations":${allConvs.size},"conversations":[$convList]}"""
+            val json = """{\"total_conversations\":${allConvs.size},\"conversations\":[$convList]}"""
             
             val contentLength = json.toByteArray().size
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: $contentLength\r\nConnection: close\r\n\r\n$json"
@@ -469,10 +470,9 @@ function checkDebug() {
     fetch('http://' + window.location.hostname + ':8080/api/debug')
         .then(r => r.json())
         .then(data => {
-            let msg = 'DEBUG INFO:\n\n';
-            msg += 'Total Conversations: ' + data.total_conversations + '\n\n';
-            if (data.conversations.length > 0) {
-                msg += 'Conversations:\n';
+            let msg = 'DEBUG INFO:\n\nTotal Conversations: ' + data.total_conversations + '\n\n';
+            if (data.conversations && data.conversations.length > 0) {
+                msg += 'Found Conversations:\n';
                 data.conversations.forEach(c => {
                     msg += '  ' + c.phone + ': ' + c.count + ' messages\n';
                 });
@@ -574,7 +574,7 @@ function renderContacts() {
 function renderMsgs() {
     const msgs = chats[active] || [];
     if (!msgs.length) {
-        document.getElementById('messages').innerHTML = '<div class="empty-message">📭 No messages yet</div>';
+        document.getElementById('messages').innerHTML = '<div class="empty-message">🗑️ No messages yet</div>';
         return;
     }
     const html = msgs.map(m => {
