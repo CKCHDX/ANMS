@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.anms"
-        minSdk = 21
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "0.1.0"
