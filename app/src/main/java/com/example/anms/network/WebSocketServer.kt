@@ -3,6 +3,7 @@ package com.example.anms.network
 import android.content.Context
 import android.util.Base64
 import android.util.Log
+import com.example.anms.utils.SMSManager
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStream
@@ -11,7 +12,7 @@ import java.security.MessageDigest
 import kotlin.concurrent.thread
 
 class WebSocketServer(
-    context: Context,
+    private val context: Context,
     private val port: Int = 8765,
     private val onMessageReceived: (String) -> Unit = {}
 ) {
@@ -19,6 +20,7 @@ class WebSocketServer(
     private var serverSocket: ServerSocket? = null
     private var isRunning = false
     private val clients = mutableListOf<WebSocketClient>()
+    private val smsManager = SMSManager(context)
 
     fun start() {
         thread {
@@ -85,8 +87,8 @@ class WebSocketServer(
                 val message = readWebSocketFrame(reader)
                 if (message != null) {
                     Log.d(tag, "Message: $message")
+                    handleCommand(message, output)
                     onMessageReceived(message)
-                    broadcastMessage(message)
                 } else {
                     break
                 }
@@ -103,6 +105,32 @@ class WebSocketServer(
             } catch (e: Exception) {
                 Log.e(tag, "Error closing client", e)
             }
+        }
+    }
+    
+    private fun handleCommand(message: String, output: OutputStream) {
+        try {
+            val parts = message.split("|", limit = 3)
+            when {
+                message.startsWith("GET_SMS_HISTORY:") -> {
+                    val phoneNumber = message.substring(16).trim()
+                    Log.d(tag, "Retrieving SMS history for $phoneNumber")
+                    val history = smsManager.formatSMSHistoryForWeb(phoneNumber)
+                    sendWebSocketFrame(output, "SMS_HISTORY|$history")
+                }
+                parts.size >= 3 && parts[0] == "SEND_SMS" -> {
+                    val phoneNumber = parts[1]
+                    val smsText = parts[2]
+                    Log.d(tag, "Sending SMS to $phoneNumber: $smsText")
+                    val success = smsManager.sendSMS(phoneNumber, smsText)
+                    val response = if (success) "SMS_SENT|$phoneNumber|OK" else "SMS_ERROR|$phoneNumber|Failed"
+                    sendWebSocketFrame(output, response)
+                    // Also broadcast to all clients
+                    broadcastMessage("SMS|$phoneNumber|$smsText|sent")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error handling command", e)
         }
     }
     
