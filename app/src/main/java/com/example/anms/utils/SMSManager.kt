@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
-import android.provider.ContactsContract
 import android.telephony.SmsManager
 import android.util.Log
 import java.text.SimpleDateFormat
@@ -26,10 +25,10 @@ class SMSManager(private val context: Context) {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             smsManager.sendTextMessage(phoneNumber, null, message, sentIntent, null)
-            Log.d(tag, "SMS sent successfully")
+            Log.d(tag, "SMS sent successfully to $phoneNumber")
             true
         } catch (e: Exception) {
-            Log.e(tag, "Error sending SMS", e)
+            Log.e(tag, "Error sending SMS to $phoneNumber", e)
             false
         }
     }
@@ -37,65 +36,72 @@ class SMSManager(private val context: Context) {
     fun getSMSHistory(phoneNumber: String): List<SMSMessage> {
         val smsList = mutableListOf<SMSMessage>()
         val uri = Uri.parse("content://sms")
-        val cursor: Cursor? = try {
+        
+        return try {
             val selection = "address = ?"
             val selectionArgs = arrayOf(phoneNumber)
-            context.contentResolver.query(
+            val cursor = context.contentResolver.query(
                 uri,
                 arrayOf("_id", "address", "body", "date", "type"),
                 selection,
                 selectionArgs,
                 "date DESC"
             )
-        } catch (e: Exception) {
-            Log.e(tag, "Error querying SMS", e)
-            null
-        }
 
-        cursor?.use {
-            val idIndex = it.getColumnIndex("_id")
-            val addressIndex = it.getColumnIndex("address")
-            val bodyIndex = it.getColumnIndex("body")
-            val dateIndex = it.getColumnIndex("date")
-            val typeIndex = it.getColumnIndex("type")
+            cursor?.use {
+                val idIndex = it.getColumnIndex("_id")
+                val addressIndex = it.getColumnIndex("address")
+                val bodyIndex = it.getColumnIndex("body")
+                val dateIndex = it.getColumnIndex("date")
+                val typeIndex = it.getColumnIndex("type")
 
-            while (it.moveToNext()) {
-                try {
-                    val id = it.getString(idIndex)
-                    val address = it.getString(addressIndex)
-                    val body = it.getString(bodyIndex)
-                    val date = it.getLong(dateIndex)
-                    val type = it.getInt(typeIndex)
+                while (it.moveToNext()) {
+                    try {
+                        val id = if (idIndex >= 0) it.getString(idIndex) else ""
+                        val address = if (addressIndex >= 0) it.getString(addressIndex) else ""
+                        val body = if (bodyIndex >= 0) it.getString(bodyIndex) else ""
+                        val date = if (dateIndex >= 0) it.getLong(dateIndex) else 0L
+                        val type = if (typeIndex >= 0) it.getInt(typeIndex) else 0
 
-                    val dateStr = dateFormat.format(Date(date))
-                    val direction = if (type == 1) "received" else "sent"
+                        val dateStr = if (date > 0) dateFormat.format(Date(date)) else "Unknown"
+                        val direction = if (type == 1) "received" else "sent"
 
-                    smsList.add(
-                        SMSMessage(
-                            id = id,
-                            phoneNumber = address,
-                            message = body,
-                            timestamp = dateStr,
-                            direction = direction
+                        smsList.add(
+                            SMSMessage(
+                                id = id,
+                                phoneNumber = address,
+                                message = body,
+                                timestamp = dateStr,
+                                direction = direction
+                            )
                         )
-                    )
-                } catch (e: Exception) {
-                    Log.e(tag, "Error parsing SMS", e)
+                    } catch (e: Exception) {
+                        Log.e(tag, "Error parsing SMS row", e)
+                    }
                 }
             }
+            Log.d(tag, "Retrieved ${smsList.size} SMS messages from $phoneNumber")
+            smsList
+        } catch (e: Exception) {
+            Log.e(tag, "Error querying SMS database", e)
+            smsList // Return empty list on error
         }
-
-        Log.d(tag, "Retrieved ${smsList.size} SMS messages from $phoneNumber")
-        return smsList
     }
 
     fun formatSMSHistoryForWeb(phoneNumber: String): String {
         val messages = getSMSHistory(phoneNumber)
         val json = StringBuilder()
         json.append("{\"phone\":\"$phoneNumber\",\"messages\":[")
+        
         messages.forEachIndexed { index, sms ->
+            val escapedBody = sms.message
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+            
             json.append(
-                """{\"id\":\"${sms.id}\",\"body\":\"${sms.message.replace("\\", "\\\\").replace("\"", "\\\"")}\",\"timestamp\":\"${sms.timestamp}\",\"direction\":\"${sms.direction}\"}"""
+                """{\"id\":\"${sms.id}\",\"body\":\"$escapedBody\",\"timestamp\":\"${sms.timestamp}\",\"direction\":\"${sms.direction}\"}"""
             )
             if (index < messages.size - 1) json.append(",")
         }
