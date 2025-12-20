@@ -3,74 +3,328 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="12dp"
+    android:background="#f5f5f5">
 
-    <TextView
-        android:id="@+id/serverStatusTextView"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Initializing..."
-        android:textSize="14sp"
-        android:textColor="#FF6200EE"
-        android:gravity="center"
-        android:padding="12dp"
-        android:background="#FFF3E5F5"
-        android:layout_marginBottom="16dp" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Messages"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="8dp" />
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/messagesRecyclerView"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginBottom="16dp" />
-
+    <!-- Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="12dp"
-        android:background="#FFFAFAFA"
-        android:elevation="4dp">
+        android:background="#667eea"
+        android:padding="16dp"
+        android:layout_marginBottom="12dp"
+        android:cornerRadius="8dp">
 
-        <EditText
-            android:id="@+id/phoneNumberInput"
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="ANMS Host Server"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="#ffffff" />
+
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:hint="Phone Number"
-            android:inputType="phone"
-            android:padding="12dp"
-            android:layout_marginBottom="8dp"
-            android:background="@android:drawable/edit_text"
-            android:textSize="14sp" />
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp"
+            android:gravity="center_vertical">
 
-        <EditText
-            android:id="@+id/messageInput"
-            android:layout_width="match_parent"
-            android:layout_height="96dp"
-            android:hint="Message"
-            android:inputType="text|textMultiLine"
-            android:padding="12dp"
-            android:layout_marginBottom="8dp"
-            android:background="@android:drawable/edit_text"
-            android:textSize="14sp"
-            android:gravity="top" />
+            <View
+                android:id="@+id/statusDot"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:background="#4caf50"
+                android:layout_marginRight="8dp" />
 
-        <Button
-            android:id="@+id/sendButton"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:text="Send SMS"
-            android:textColor="#FFFFFFFF"
-            android:background="#FF6200EE" />
+            <TextView
+                android:id="@+id/statusText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Initializing..."
+                android:textColor="#ffffff"
+                android:textSize="12sp" />
+        </LinearLayout>
 
+        <TextView
+            android:id="@+id/serverPortsText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="HTTP: 8080 | WS: 8765"
+            android:textColor="rgba(255,255,255,0.7)"
+            android:textSize="11sp"
+            android:layout_marginTop="4dp" />
     </LinearLayout>
 
+    <!-- Server Control Panel -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginBottom="12dp"
+        android:gap="8dp">
+
+        <Button
+            android:id="@+id/startServerButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="Start"
+            android:textSize="12sp"
+            android:background="#4caf50"
+            android:textColor="#ffffff" />
+
+        <Button
+            android:id="@+id/stopServerButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="Stop"
+            android:textSize="12sp"
+            android:background="#f44336"
+            android:textColor="#ffffff" />
+
+        <Button
+            android:id="@+id/restartServerButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="Restart"
+            android:textSize="12sp"
+            android:background="#ff9800"
+            android:textColor="#ffffff" />
+    </LinearLayout>
+
+    <!-- Server Statistics -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#ffffff"
+        android:padding="12dp"
+        android:layout_marginBottom="12dp"
+        android:gravity="center_vertical"
+        android:gap="16dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Clients"
+                android:textSize="12sp"
+                android:textColor="#999" />
+
+            <TextView
+                android:id="@+id/clientCountText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="#333" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Messages"
+                android:textSize="12sp"
+                android:textColor="#999" />
+
+            <TextView
+                android:id="@+id/messageCountText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="#333" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Uptime"
+                android:textSize="12sp"
+                android:textColor="#999" />
+
+            <TextView
+                android:id="@+id/uptimeText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0s"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="#333" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Tab Selector -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#ffffff"
+        android:gravity="center"
+        android:layout_marginBottom="8dp">
+
+        <Button
+            android:id="@+id/messagesTabButton"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:text="Messages"
+            android:textSize="12sp"
+            android:background="#667eea"
+            android:textColor="#ffffff" />
+
+        <Button
+            android:id="@+id/logsTabButton"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:text="Server Logs"
+            android:textSize="12sp"
+            android:background="#ccc"
+            android:textColor="#333" />
+
+        <Button
+            android:id="@+id/smsTabButton"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:text="SMS"
+            android:textSize="12sp"
+            android:background="#ccc"
+            android:textColor="#333" />
+    </LinearLayout>
+
+    <!-- Content Area -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#ffffff">
+
+        <!-- Messages Tab -->
+        <LinearLayout
+            android:id="@+id/messagesTab"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/messagesRecyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="#f9f9f9" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="12dp"
+                android:background="#ffffff"
+                android:borderBottom="1dp">
+
+                <EditText
+                    android:id="@+id/phoneNumberInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:hint="Phone number: +1234567890"
+                    android:inputType="phone"
+                    android:paddingHorizontal="12dp"
+                    android:background="#f0f0f0"
+                    android:layout_marginBottom="8dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gap="8dp">
+
+                    <EditText
+                        android:id="@+id/messageInput"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
+                        android:hint="Type message..."
+                        android:inputType="text"
+                        android:paddingHorizontal="12dp"
+                        android:background="#f0f0f0" />
+
+                    <Button
+                        android:id="@+id/sendButton"
+                        android:layout_width="60dp"
+                        android:layout_height="40dp"
+                        android:text="Send"
+                        android:textSize="12sp"
+                        android:background="#667eea"
+                        android:textColor="#ffffff" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Logs Tab -->
+        <LinearLayout
+            android:id="@+id/logsTab"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/logsRecyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#1e1e1e"
+                android:paddingHorizontal="8dp" />
+        </LinearLayout>
+
+        <!-- SMS Tab -->
+        <LinearLayout
+            android:id="@+id/smsTab"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:padding="12dp"
+            android:gravity="center">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="SMS List"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="12dp" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/smsRecyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#f9f9f9" />
+        </LinearLayout>
+    </FrameLayout>
 </LinearLayout>
