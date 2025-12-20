@@ -3,6 +3,7 @@ package com.example.anms.network
 import android.content.Context
 import android.telephony.SmsManager
 import android.util.Log
+import com.example.anms.sms.SmsDatabase
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.PrintWriter
@@ -15,7 +16,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
     private var serverSocket: ServerSocket? = null
     private var isRunning = false
     private val smsManager = SmsManager.getDefault()
-    private val messageHistory = mutableMapOf<String, MutableList<Map<String, String>>>()
+    private val smsDb = SmsDatabase(context)
 
     fun start() {
         thread {
@@ -64,6 +65,10 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
 
             val response = when {
                 path == "/" -> sendHtmlResponse(getHtml())
+                path.startsWith("/api/chat/") -> {
+                    val phone = URLDecoder.decode(path.substring(10), "UTF-8")
+                    handleGetChat(phone)
+                }
                 path.startsWith("/send") && method == "POST" -> {
                     val body = if (contentLength > 0) {
                         val chars = CharArray(contentLength)
@@ -86,9 +91,29 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
         }
     }
 
+    private fun handleGetChat(phone: String): String {
+        return try {
+            Log.d(tag, "Loading chat for: $phone")
+            val messages = smsDb.getConversation(phone, 100)
+            
+            val json = messages.joinToString(",") { msg ->
+                val dir = if (msg.type == 1) "in" else "out"
+                val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(msg.timestamp)
+                val cleanBody = msg.body.replace("\\", " ").replace("\"", "\\\"")
+                """{"body":"$cleanBody","dir":"$dir","time":"$time"}"""
+            }
+            
+            val body = "[$json]"
+            val contentLength = body.toByteArray().size
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: $contentLength\r\nConnection: close\r\n\r\n$body"
+        } catch (e: Exception) {
+            Log.e(tag, "Error loading chat: ${e.message}")
+            jsonResponse(false, "Error: ${e.message}")
+        }
+    }
+
     private fun handleSendMessage(body: String): String {
         return try {
-            // Parse: phone=XXX&message=YYY
             val params = body.split("&").associate {
                 val kv = it.split("=")
                 Pair(kv[0], URLDecoder.decode(kv.getOrNull(1) ?: "", "UTF-8"))
@@ -100,17 +125,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             
             try {
                 smsManager.sendTextMessage(phone, null, message, null, null)
-                
-                // Store in history
-                if (!messageHistory.containsKey(phone)) {
-                    messageHistory[phone] = mutableListOf()
-                }
-                messageHistory[phone]?.add(mapOf(
-                    "text" to message,
-                    "direction" to "out",
-                    "time" to java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(java.util.Date())
-                ))
-                
+                Log.d(tag, "SMS sent successfully")
                 jsonResponse(true, "SMS sent")
             } catch (e: Exception) {
                 Log.e(tag, "SMS error: ${e.message}")
@@ -140,126 +155,200 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
 
     private fun getHtml(): String {
         return """<!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>ANMS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <title>ANMS Chat</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: monospace; background: #000; color: #0f0; font-size: 14px; }
-        .container { max-width: 240px; margin: 0 auto; padding: 8px; }
-        .header { background: #003; padding: 8px; margin-bottom: 8px; border: 1px solid #006; text-align: center; }
-        .input-row { display: flex; gap: 4px; margin-bottom: 8px; }
-        .input-row input { flex: 1; padding: 6px; background: #001; border: 1px solid #003; color: #0f0; font-size: 12px; }
-        .btn { padding: 6px 12px; background: #006; color: #0f0; border: 1px solid #00f; cursor: pointer; font-size: 12px; font-weight: bold; }
-        .btn:active { background: #00f; }
-        .contacts { margin-bottom: 8px; padding: 6px; background: #001; border: 1px solid #003; max-height: 80px; overflow-y: auto; }
-        .contact { padding: 4px; cursor: pointer; border-bottom: 1px solid #003; font-size: 12px; }
-        .contact:hover { background: #002; }
-        .contact.active { background: #006; color: #0ff; }
-        .messages { height: 180px; background: #000; border: 1px solid #003; padding: 6px; overflow-y: auto; margin-bottom: 8px; display: flex; flex-direction: column; gap: 4px; }
-        .msg { padding: 4px; font-size: 12px; word-wrap: break-word; max-width: 100%; line-height: 1.3; }
-        .msg.in { background: #003; color: #0f0; }
-        .msg.out { background: #006; color: #0ff; text-align: right; }
-        .input-msg { display: flex; gap: 4px; }
-        .input-msg textarea { flex: 1; padding: 4px; background: #001; border: 1px solid #003; color: #0f0; font-size: 12px; font-family: monospace; height: 40px; resize: none; }
-        .status { font-size: 11px; color: #666; padding: 4px; text-align: center; border-top: 1px solid #003; }
+        body { 
+            font-family: Courier, monospace; 
+            background: #1a1a1a; 
+            color: #00ff00; 
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .container { max-width: 240px; margin: 0 auto; padding: 6px; height: 100vh; display: flex; flex-direction: column; }
+        .header { background: #003300; padding: 8px; margin-bottom: 6px; border: 2px solid #00ff00; text-align: center; font-weight: bold; }
+        .controls { display: flex; gap: 4px; margin-bottom: 6px; }
+        .controls input { flex: 1; padding: 6px; background: #0a0a0a; border: 1px solid #00ff00; color: #00ff00; font-family: monospace; font-size: 12px; }
+        .controls button { padding: 6px 12px; background: #003300; color: #00ff00; border: 1px solid #00ff00; cursor: pointer; font-family: monospace; font-weight: bold; }
+        .controls button:active { background: #00ff00; color: #000; }
+        .contacts { 
+            background: #0a0a0a; 
+            border: 1px solid #00ff00; 
+            padding: 6px;
+            max-height: 60px; 
+            overflow-y: auto;
+            margin-bottom: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .contact { 
+            padding: 4px; 
+            cursor: pointer; 
+            border: 1px solid #003300;
+            background: #1a1a1a;
+            font-size: 12px;
+        }
+        .contact:hover { background: #003300; }
+        .contact.active { background: #00ff00; color: #000; font-weight: bold; }
+        .messages { 
+            flex: 1;
+            background: #0a0a0a; 
+            border: 1px solid #00ff00; 
+            padding: 6px;
+            overflow-y: auto;
+            margin-bottom: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            font-size: 12px;
+        }
+        .msg { padding: 4px; word-wrap: break-word; }
+        .msg.in { color: #00ff00; }
+        .msg.out { color: #ffff00; }
+        .msg.time { color: #888; font-size: 10px; }
+        .input-area { display: flex; gap: 4px; margin-bottom: 6px; }
+        .input-area textarea { flex: 1; padding: 6px; background: #0a0a0a; border: 1px solid #00ff00; color: #00ff00; font-family: monospace; font-size: 12px; resize: none; height: 50px; }
+        .input-area button { padding: 6px 10px; background: #003300; color: #00ff00; border: 1px solid #00ff00; cursor: pointer; font-family: monospace; font-weight: bold; }
+        .input-area button:active { background: #00ff00; color: #000; }
+        .status { background: #003300; padding: 4px; text-align: center; font-size: 11px; border-top: 1px solid #00ff00; }
+        .loading { color: #ff6600; }
     </style>
 </head>
 <body>
 <div class="container">
-    <div class="header">ANMS CHAT</div>
+    <div class="header">ANMS SMS CHAT</div>
     
-    <div class="input-row">
-        <input type="tel" id="phone" placeholder="Phone #" maxlength="15">
-        <button class="btn" onclick="addContact()">Add</button>
+    <div class="controls">
+        <input type="tel" id="phone" placeholder="+1234567890" maxlength="20">
+        <button onclick="addContact()">Add</button>
     </div>
     
     <div class="contacts" id="contacts"></div>
     
     <div class="messages" id="messages"></div>
     
-    <div class="input-msg">
-        <textarea id="msg" placeholder="Message" disabled></textarea>
-        <button class="btn" onclick="send()" id="sendBtn" disabled>Send</button>
+    <div class="input-area">
+        <textarea id="msg" placeholder="Message..." disabled></textarea>
+        <button onclick="send()" id="sendBtn" disabled>Send</button>
     </div>
     
-    <div class="status" id="status">Connecting...</div>
+    <div class="status" id="status">Ready</div>
 </div>
 
 <script>
-let ws, activePhone, chats = {}, contacts = [];
+let ws, active, chats = {}, contacts = [];
 
-function initWS() {
+function init() {
+    contacts = JSON.parse(localStorage.getItem('anms_contacts') || '[]');
+    chats = JSON.parse(localStorage.getItem('anms_chats') || '{}');
+    renderContacts();
+    connectWS();
+}
+
+function connectWS() {
     const host = window.location.hostname;
-    ws = new WebSocket('ws://' + host + ':8765');
-    ws.onopen = () => updateStatus('Ready');
-    ws.onmessage = e => {
-        if (e.data.startsWith('INCOMING_SMS|')) {
-            const [_, phone, ...msgParts] = e.data.split('|');
-            const text = msgParts.join('|');
-            addMsg(phone, text, 'in');
-        }
-    };
-    ws.onclose = () => { updateStatus('Offline'); setTimeout(initWS, 3000); };
-    ws.onerror = () => updateStatus('Error');
+    try {
+        ws = new WebSocket('ws://' + host + ':8765');
+        ws.onopen = () => updateStatus('Connected');
+        ws.onmessage = e => {
+            if (e.data.startsWith('INCOMING_SMS|')) {
+                const [_, phone, ...msgParts] = e.data.split('|');
+                const text = msgParts.join('|');
+                loadChat(phone).then(() => {
+                    if (active === phone) renderMsgs();
+                });
+            }
+        };
+        ws.onclose = () => { updateStatus('Offline'); setTimeout(connectWS, 3000); };
+        ws.onerror = () => updateStatus('Error');
+    } catch (e) {
+        updateStatus('WS Error');
+    }
 }
 
 function addContact() {
     const p = document.getElementById('phone').value.trim();
     if (!p || contacts.includes(p)) return;
     contacts.push(p);
-    chats[p] = [];
+    localStorage.setItem('anms_contacts', JSON.stringify(contacts));
     document.getElementById('phone').value = '';
     renderContacts();
     selectContact(p);
 }
 
 function selectContact(p) {
-    activePhone = p;
+    active = p;
     renderContacts();
     document.getElementById('msg').disabled = false;
     document.getElementById('sendBtn').disabled = false;
-    renderMsgs();
-    document.getElementById('msg').focus();
+    loadChat(p).then(() => renderMsgs());
 }
 
-function addMsg(phone, text, dir) {
-    if (!chats[phone]) chats[phone] = [];
-    chats[phone].push({ text, dir, time: new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}) });
-    if (activePhone === phone) renderMsgs();
-    renderContacts();
+function loadChat(phone) {
+    updateStatus('Loading...');
+    return fetch('http://' + window.location.hostname + ':8080/api/chat/' + encodeURIComponent(phone))
+        .then(r => r.json())
+        .then(data => {
+            chats[phone] = data;
+            localStorage.setItem('anms_chats', JSON.stringify(chats));
+            updateStatus('Ready');
+            return data;
+        })
+        .catch(e => {
+            updateStatus('Error loading');
+            console.error('Load error:', e);
+        });
 }
 
 function send() {
-    if (!activePhone) return;
+    if (!active) return;
     const text = document.getElementById('msg').value.trim();
     if (!text) return;
     
-    addMsg(activePhone, text, 'out');
+    document.getElementById('sendBtn').disabled = true;
     document.getElementById('msg').value = '';
+    updateStatus('Sending...');
     
     fetch('http://' + window.location.hostname + ':8080/send', {
         method: 'POST',
-        body: 'phone=' + encodeURIComponent(activePhone) + '&message=' + encodeURIComponent(text)
-    }).catch(e => addMsg(activePhone, 'Failed: ' + e, 'err'));
+        body: 'phone=' + encodeURIComponent(active) + '&message=' + encodeURIComponent(text)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            loadChat(active).then(() => renderMsgs());
+            updateStatus('Ready');
+        } else {
+            updateStatus('Send failed');
+        }
+        document.getElementById('sendBtn').disabled = false;
+    })
+    .catch(e => {
+        updateStatus('Error');
+        document.getElementById('sendBtn').disabled = false;
+    });
 }
 
 function renderContacts() {
     const html = contacts.map(p => {
-        const last = chats[p].length > 0 ? chats[p][chats[p].length-1].text : '';
-        return '<div class="contact ' + (activePhone === p ? 'active' : '') + '" onclick="selectContact(\'' + p + '\')" title="' + last + '">' + p + '</div>';
+        const cnt = (chats[p] || []).length;
+        return '<div class="contact ' + (active === p ? 'active' : '') + '" onclick="selectContact(\'' + p + '\')">' + p + ' (' + cnt + ')</div>';
     }).join('');
-    document.getElementById('contacts').innerHTML = html;
+    document.getElementById('contacts').innerHTML = html || '<div style="color: #666;">No contacts</div>';
 }
 
 function renderMsgs() {
-    const html = (chats[activePhone] || []).map(m => 
-        '<div class="msg ' + m.dir + '">' + m.text + '</div>'
+    const msgs = chats[active] || [];
+    const html = msgs.map(m => 
+        '<div><div class="msg ' + m.dir + '">' + m.body + '</div><div class="msg time">' + m.time + '</div></div>'
     ).join('');
     const c = document.getElementById('messages');
-    c.innerHTML = html;
+    c.innerHTML = html || '<div style="color: #666; text-align: center; margin-top: 20px;">No messages</div>';
     c.scrollTop = c.scrollHeight;
 }
 
@@ -275,7 +364,7 @@ document.getElementById('phone').addEventListener('keypress', e => {
     if (e.key === 'Enter') addContact();
 });
 
-initWS();
+init();
 </script>
 </body>
 </html>"""
