@@ -67,6 +67,8 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 path == "/" -> sendHtmlResponse(getHtml())
                 path.startsWith("/api/chat/") -> {
                     val phone = URLDecoder.decode(path.substring(10), "UTF-8")
+                    Log.d(tag, "=== CHAT REQUEST ===")
+                    Log.d(tag, "Raw phone: $phone")
                     handleGetChat(phone)
                 }
                 path.startsWith("/send") && method == "POST" -> {
@@ -94,7 +96,8 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
     private fun handleGetChat(phone: String): String {
         return try {
             Log.d(tag, "Loading chat for: $phone")
-            val messages = smsDb.getConversation(phone, 100)
+            val messages = smsDb.getConversation(phone, 500)
+            Log.d(tag, "Got ${messages.size} messages")
             
             val json = messages.joinToString(",") { msg ->
                 val dir = if (msg.type == 1) "in" else "out"
@@ -107,7 +110,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             val contentLength = body.toByteArray().size
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: $contentLength\r\nConnection: close\r\n\r\n$body"
         } catch (e: Exception) {
-            Log.e(tag, "Error loading chat: ${e.message}")
+            Log.e(tag, "Error loading chat: ${e.message}", e)
             jsonResponse(false, "Error: ${e.message}")
         }
     }
@@ -241,7 +244,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
 </div>
 
 <script>
-let ws, active, chats = {}, contacts = [];
+let ws, active, chats = {}, contacts = [], pollInterval;
 
 function init() {
     contacts = JSON.parse(localStorage.getItem('anms_contacts') || '[]');
@@ -256,24 +259,28 @@ function connectWS() {
         ws = new WebSocket('ws://' + host + ':8765');
         ws.onopen = () => updateStatus('Connected');
         ws.onmessage = e => {
+            console.log('WS Message:', e.data);
             if (e.data.startsWith('INCOMING_SMS|')) {
                 const [_, phone, ...msgParts] = e.data.split('|');
                 const text = msgParts.join('|');
+                console.log('New SMS from:', phone, text);
                 loadChat(phone).then(() => {
                     if (active === phone) renderMsgs();
                 });
             }
         };
         ws.onclose = () => { updateStatus('Offline'); setTimeout(connectWS, 3000); };
-        ws.onerror = () => updateStatus('Error');
+        ws.onerror = (e) => { console.error('WS Error:', e); updateStatus('Error'); };
     } catch (e) {
+        console.error('WS Connect Error:', e);
         updateStatus('WS Error');
     }
 }
 
 function addContact() {
     const p = document.getElementById('phone').value.trim();
-    if (!p || contacts.includes(p)) return;
+    if (!p) { alert('Enter phone'); return; }
+    if (contacts.includes(p)) { alert('Already added'); return; }
     contacts.push(p);
     localStorage.setItem('anms_contacts', JSON.stringify(contacts));
     document.getElementById('phone').value = '';
@@ -282,34 +289,59 @@ function addContact() {
 }
 
 function selectContact(p) {
+    console.log('Selecting contact:', p);
     active = p;
     renderContacts();
     document.getElementById('msg').disabled = false;
     document.getElementById('sendBtn').disabled = false;
-    loadChat(p).then(() => renderMsgs());
+    clearInterval(pollInterval);
+    loadChat(p).then(() => {
+        renderMsgs();
+        startPolling();
+    });
 }
 
 function loadChat(phone) {
+    console.log('Loading chat for:', phone);
     updateStatus('Loading...');
     return fetch('http://' + window.location.hostname + ':8080/api/chat/' + encodeURIComponent(phone))
-        .then(r => r.json())
+        .then(r => {
+            console.log('Response status:', r.status);
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        })
         .then(data => {
+            console.log('Loaded', data.length, 'messages');
             chats[phone] = data;
             localStorage.setItem('anms_chats', JSON.stringify(chats));
             updateStatus('Ready');
             return data;
         })
         .catch(e => {
-            updateStatus('Error loading');
             console.error('Load error:', e);
+            updateStatus('Error loading');
         });
 }
 
+function startPolling() {
+    console.log('Started polling for:', active);
+    pollInterval = setInterval(() => {
+        if (active) {
+            loadChat(active).then(() => {
+                const msgCount = (chats[active] || []).length;
+                console.log('Poll update: ' + msgCount + ' messages');
+                renderMsgs();
+            }).catch(e => console.error('Poll error:', e));
+        }
+    }, 2000);
+}
+
 function send() {
-    if (!active) return;
+    if (!active) { alert('Select contact'); return; }
     const text = document.getElementById('msg').value.trim();
     if (!text) return;
     
+    console.log('Sending to:', active);
     document.getElementById('sendBtn').disabled = true;
     document.getElementById('msg').value = '';
     updateStatus('Sending...');
@@ -320,15 +352,17 @@ function send() {
     })
     .then(r => r.json())
     .then(data => {
-        if (data.success) {
-            loadChat(active).then(() => renderMsgs());
-            updateStatus('Ready');
-        } else {
-            updateStatus('Send failed');
-        }
+        console.log('Send response:', data);
         document.getElementById('sendBtn').disabled = false;
+        if (data.success) {
+            updateStatus('Sent');
+            setTimeout(() => loadChat(active).then(() => renderMsgs()), 1000);
+        } else {
+            updateStatus('Send failed: ' + data.message);
+        }
     })
     .catch(e => {
+        console.error('Send error:', e);
         updateStatus('Error');
         document.getElementById('sendBtn').disabled = false;
     });
@@ -337,7 +371,7 @@ function send() {
 function renderContacts() {
     const html = contacts.map(p => {
         const cnt = (chats[p] || []).length;
-        return '<div class="contact ' + (active === p ? 'active' : '') + '" onclick="selectContact(\'' + p + '\')\'>' + p + ' (' + cnt + ')</div>';
+        return '<div class="contact ' + (active === p ? 'active' : '') + '" onclick="selectContact(\'' + p.replace(/'/g, "\\\"") + '\')\'>' + p + ' (' + cnt + ')</div>';
     }).join('');
     document.getElementById('contacts').innerHTML = html || '<div style="color: #666;">No contacts</div>';
 }
@@ -345,7 +379,7 @@ function renderContacts() {
 function renderMsgs() {
     const msgs = chats[active] || [];
     const html = msgs.map(m => 
-        '<div><div class="msg ' + m.dir + '">' + m.body + '</div><div class="msg time">' + m.time + '</div></div>'
+        '<div><div class="msg ' + m.dir + '">' + escapeHtml(m.body) + '</div><div class="msg time">' + m.time + '</div></div>'
     ).join('');
     const c = document.getElementById('messages');
     c.innerHTML = html || '<div style="color: #666; text-align: center; margin-top: 20px;">No messages</div>';
@@ -354,6 +388,12 @@ function renderMsgs() {
 
 function updateStatus(s) {
     document.getElementById('status').textContent = s;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 document.getElementById('msg').addEventListener('keypress', e => {
