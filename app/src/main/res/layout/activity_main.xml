@@ -13,8 +13,7 @@
         android:orientation="vertical"
         android:background="#667eea"
         android:padding="16dp"
-        android:layout_marginBottom="12dp"
-        android:cornerRadius="8dp">
+        android:layout_marginBottom="12dp">
 
         <TextView
             android:layout_width="wrap_content"
@@ -28,8 +27,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginTop="8dp"
-            android:gravity="center_vertical">
+            android:layout_marginTop="8dp">
 
             <View
                 android:id="@+id/statusDot"
@@ -53,7 +51,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="HTTP: 8080 | WS: 8765"
-            android:textColor="rgba(255,255,255,0.7)"
+            android:textColor="#cccccc"
             android:textSize="11sp"
             android:layout_marginTop="4dp" />
     </LinearLayout>
@@ -63,9 +61,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center"
-        android:layout_marginBottom="12dp"
-        android:gap="8dp">
+        android:layout_marginBottom="12dp">
 
         <Button
             android:id="@+id/startServerButton"
@@ -75,7 +71,8 @@
             android:text="Start"
             android:textSize="12sp"
             android:background="#4caf50"
-            android:textColor="#ffffff" />
+            android:textColor="#ffffff"
+            android:layout_marginRight="4dp" />
 
         <Button
             android:id="@+id/stopServerButton"
@@ -85,7 +82,8 @@
             android:text="Stop"
             android:textSize="12sp"
             android:background="#f44336"
-            android:textColor="#ffffff" />
+            android:textColor="#ffffff"
+            android:layout_marginRight="4dp" />
 
         <Button
             android:id="@+id/restartServerButton"
@@ -105,22 +103,21 @@
         android:orientation="horizontal"
         android:background="#ffffff"
         android:padding="12dp"
-        android:layout_marginBottom="12dp"
-        android:gravity="center_vertical"
-        android:gap="16dp">
+        android:layout_marginBottom="12dp">
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:layout_marginRight="16dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Clients"
                 android:textSize="12sp"
-                android:textColor="#999" />
+                android:textColor="#999999" />
 
             <TextView
                 android:id="@+id/clientCountText"
@@ -129,21 +126,22 @@
                 android:text="0"
                 android:textSize="20sp"
                 android:textStyle="bold"
-                android:textColor="#333" />
+                android:textColor="#333333" />
         </LinearLayout>
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:layout_marginRight="16dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Messages"
                 android:textSize="12sp"
-                android:textColor="#999" />
+                android:textColor="#999999" />
 
             <TextView
                 android:id="@+id/messageCountText"
@@ -152,7 +150,7 @@
                 android:text="0"
                 android:textSize="20sp"
                 android:textStyle="bold"
-                android:textColor="#333" />
+                android:textColor="#333333" />
         </LinearLayout>
 
         <LinearLayout
@@ -166,7 +164,7 @@
                 android:layout_height="wrap_content"
                 android:text="Uptime"
                 android:textSize="12sp"
-                android:textColor="#999" />
+                android:textColor="#999999" />
 
             <TextView
                 android:id="@+id/uptimeText"
@@ -175,7 +173,7 @@
                 android:text="0s"
                 android:textSize="20sp"
                 android:textStyle="bold"
-                android:textColor="#333" />
+                android:textColor="#333333" />
         </LinearLayout>
     </LinearLayout>
 
@@ -185,7 +183,6 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:background="#ffffff"
-        android:gravity="center"
         android:layout_marginBottom="8dp">
 
         <Button
@@ -196,17 +193,19 @@
             android:text="Messages"
             android:textSize="12sp"
             android:background="#667eea"
-            android:textColor="#ffffff" />
+            android:textColor="#ffffff"
+            android:layout_marginRight="2dp" />
 
         <Button
             android:id="@+id/logsTabButton"
             android:layout_width="0dp"
             android:layout_height="44dp"
             android:layout_weight="1"
-            android:text="Server Logs"
+            android:text="Logs"
             android:textSize="12sp"
-            android:background="#ccc"
-            android:textColor="#333" />
+            android:background="#cccccc"
+            android:textColor="#333333"
+            android:layout_marginRight="2dp" />
 
         <Button
             android:id="@+id/smsTabButton"
@@ -215,8 +214,8 @@
             android:layout_weight="1"
             android:text="SMS"
             android:textSize="12sp"
-            android:background="#ccc"
-            android:textColor="#333" />
+            android:background="#cccccc"
+            android:textColor="#333333" />
     </LinearLayout>
 
     <!-- Content Area -->
@@ -245,8 +244,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="12dp"
-                android:background="#ffffff"
-                android:borderBottom="1dp">
+                android:background="#ffffff">
 
                 <EditText
                     android:id="@+id/phoneNumberInput"
@@ -254,15 +252,15 @@
                     android:layout_height="40dp"
                     android:hint="Phone number: +1234567890"
                     android:inputType="phone"
-                    android:paddingHorizontal="12dp"
+                    android:paddingLeft="12dp"
+                    android:paddingRight="12dp"
                     android:background="#f0f0f0"
                     android:layout_marginBottom="8dp" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gap="8dp">
+                    android:orientation="horizontal">
 
                     <EditText
                         android:id="@+id/messageInput"
@@ -271,8 +269,10 @@
                         android:layout_weight="1"
                         android:hint="Type message..."
                         android:inputType="text"
-                        android:paddingHorizontal="12dp"
-                        android:background="#f0f0f0" />
+                        android:paddingLeft="12dp"
+                        android:paddingRight="12dp"
+                        android:background="#f0f0f0"
+                        android:layout_marginRight="8dp" />
 
                     <Button
                         android:id="@+id/sendButton"
@@ -299,7 +299,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:background="#1e1e1e"
-                android:paddingHorizontal="8dp" />
+                android:paddingLeft="8dp"
+                android:paddingRight="8dp" />
         </LinearLayout>
 
         <!-- SMS Tab -->
@@ -309,8 +310,7 @@
             android:layout_height="match_parent"
             android:orientation="vertical"
             android:visibility="gone"
-            android:padding="12dp"
-            android:gravity="center">
+            android:padding="12dp">
 
             <TextView
                 android:layout_width="wrap_content"
