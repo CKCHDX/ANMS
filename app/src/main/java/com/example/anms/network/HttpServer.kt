@@ -17,6 +17,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
     private var isRunning = false
     private val smsManager = SmsManager.getDefault()
     private val smsDb = SmsDatabase(context)
+    private var lastChecked = mutableMapOf<String, Long>()
 
     fun start() {
         thread {
@@ -94,20 +95,22 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
     private fun handleGetChat(phone: String): String {
         return try {
             Log.d(tag, "Loading chat for: $phone")
-            val messages = smsDb.getConversation(phone, 100)
+            val messages = smsDb.getConversation(phone, 500)
             
             val json = messages.joinToString(",") { msg ->
                 val dir = if (msg.type == 1) "in" else "out"
                 val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(msg.timestamp)
                 val cleanBody = msg.body.replace("\\", " ").replace("\"", "\\\"")
-                """{"body":"$cleanBody","dir":"$dir","time":"$time"}"""
+                """{"body":"$cleanBody","dir":"$dir","time":"$time","ts":${msg.timestamp}}"""
             }
+            
+            lastChecked[phone] = System.currentTimeMillis()
             
             val body = "[$json]"
             val contentLength = body.toByteArray().size
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: $contentLength\r\nConnection: close\r\n\r\n$body"
         } catch (e: Exception) {
-            Log.e(tag, "Error loading chat: ${e.message}")
+            Log.e(tag, "Error loading chat: ${e.message}", e)
             jsonResponse(false, "Error: ${e.message}")
         }
     }
@@ -128,7 +131,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 Log.d(tag, "SMS sent successfully")
                 jsonResponse(true, "SMS sent")
             } catch (e: Exception) {
-                Log.e(tag, "SMS error: ${e.message}")
+                Log.e(tag, "SMS error: ${e.message}", e)
                 jsonResponse(false, e.message ?: "SMS failed")
             }
         } catch (e: Exception) {
@@ -158,117 +161,340 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-    <title>ANMS Chat</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+    <title>ANMS - SMS Chat</title>
     <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #1e40af;
+            --secondary: #10b981;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-light: #64748b;
+        }
+        
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; }
         body { 
-            font-family: Courier, monospace; 
-            background: #1a1a1a; 
-            color: #00ff00; 
-            font-size: 13px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .container {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .sidebar {
+            width: 100%;
+            max-width: 280px;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        .add-contact {
+            padding: 12px;
+            display: flex;
+            gap: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .add-contact input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        
+        .add-contact input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .add-contact button {
+            padding: 8px 16px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .add-contact button:hover {
+            background: var(--primary-dark);
+        }
+        
+        .add-contact button:active {
+            transform: scale(0.98);
+        }
+        
+        .contacts {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .contact {
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border);
+            transition: background 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .contact:hover {
+            background: #f1f5f9;
+        }
+        
+        .contact.active {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .contact-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .contact-phone {
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .contact-badge {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+        
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--bg);
+        }
+        
+        .chat-header {
+            padding: 16px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .message {
+            display: flex;
+            gap: 8px;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .message.in {
+            justify-content: flex-start;
+        }
+        
+        .message.out {
+            justify-content: flex-end;
+        }
+        
+        .message-bubble {
+            max-width: 70%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            word-wrap: break-word;
+            font-size: 14px;
             line-height: 1.4;
         }
-        .container { max-width: 240px; margin: 0 auto; padding: 6px; height: 100vh; display: flex; flex-direction: column; }
-        .header { background: #003300; padding: 8px; margin-bottom: 6px; border: 2px solid #00ff00; text-align: center; font-weight: bold; }
-        .controls { display: flex; gap: 4px; margin-bottom: 6px; }
-        .controls input { flex: 1; padding: 6px; background: #0a0a0a; border: 1px solid #00ff00; color: #00ff00; font-family: monospace; font-size: 12px; }
-        .controls button { padding: 6px 12px; background: #003300; color: #00ff00; border: 1px solid #00ff00; cursor: pointer; font-family: monospace; font-weight: bold; }
-        .controls button:active { background: #00ff00; color: #000; }
-        .contacts { 
-            background: #0a0a0a; 
-            border: 1px solid #00ff00; 
-            padding: 6px;
-            max-height: 60px; 
-            overflow-y: auto;
-            margin-bottom: 6px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
+        
+        .message.in .message-bubble {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
         }
-        .contact { 
-            padding: 4px; 
-            cursor: pointer; 
-            border: 1px solid #003300;
-            background: #1a1a1a;
+        
+        .message.out .message-bubble {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .message-time {
             font-size: 12px;
+            color: var(--text-light);
+            padding: 0 4px;
+            align-self: flex-end;
         }
-        .contact:hover { background: #003300; }
-        .contact.active { background: #00ff00; color: #000; font-weight: bold; }
-        .messages { 
+        
+        .empty-state {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-light);
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .input-area {
+            padding: 12px;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 8px;
+        }
+        
+        .input-area textarea {
             flex: 1;
-            background: #0a0a0a; 
-            border: 1px solid #00ff00; 
-            padding: 6px;
-            overflow-y: auto;
-            margin-bottom: 6px;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-            font-size: 12px;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 14px;
+            resize: none;
+            max-height: 100px;
         }
-        .msg { padding: 4px; word-wrap: break-word; }
-        .msg.in { color: #00ff00; }
-        .msg.out { color: #ffff00; }
-        .msg.time { color: #888; font-size: 10px; }
-        .input-area { display: flex; gap: 4px; margin-bottom: 6px; }
-        .input-area textarea { flex: 1; padding: 6px; background: #0a0a0a; border: 1px solid #00ff00; color: #00ff00; font-family: monospace; font-size: 12px; resize: none; height: 50px; }
-        .input-area button { padding: 6px 10px; background: #003300; color: #00ff00; border: 1px solid #00ff00; cursor: pointer; font-family: monospace; font-weight: bold; }
-        .input-area button:active { background: #00ff00; color: #000; }
-        .status { background: #003300; padding: 4px; text-align: center; font-size: 11px; border-top: 1px solid #00ff00; }
-        .loading { color: #ff6600; }
+        
+        .input-area textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .input-area button {
+            padding: 10px 20px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+        
+        .input-area button:hover {
+            background: var(--primary-dark);
+        }
+        
+        .input-area button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            padding: 8px 16px;
+            font-size: 12px;
+            color: var(--text-light);
+            text-align: center;
+            background: #f1f5f9;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                max-width: 100%;
+                width: 100%;
+                max-height: 40%;
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+            }
+            
+            .chat-area {
+                flex: 1;
+            }
+            
+            .message-bubble {
+                max-width: 85%;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .sidebar {
+                max-height: 35%;
+            }
+            
+            .sidebar-header,
+            .add-contact,
+            .chat-header {
+                padding: 12px;
+            }
+            
+            .messages {
+                padding: 12px;
+            }
+        }
     </style>
 </head>
 <body>
 <div class="container">
-    <div class="header">ANMS SMS CHAT</div>
-    
-    <div class="controls">
-        <input type="tel" id="phone" placeholder="+1234567890" maxlength="20">
-        <button onclick="addContact()">Add</button>
+    <div class="sidebar">
+        <div class="sidebar-header">💬 Messages</div>
+        <div class="add-contact">
+            <input type="tel" id="phone" placeholder="+1234567890" maxlength="20">
+            <button onclick="addContact()">Add</button>
+        </div>
+        <div class="contacts" id="contacts"></div>
     </div>
     
-    <div class="contacts" id="contacts"></div>
-    
-    <div class="messages" id="messages"></div>
-    
-    <div class="input-area">
-        <textarea id="msg" placeholder="Message..." disabled></textarea>
-        <button onclick="send()" id="sendBtn" disabled>Send</button>
+    <div class="chat-area">
+        <div class="chat-header" id="chatHeader">Select a contact</div>
+        <div class="messages" id="messages"><div class="empty-state">👈 Select a contact to start</div></div>
+        <div class="input-area">
+            <textarea id="msg" placeholder="Type a message..." disabled></textarea>
+            <button onclick="send()" id="sendBtn" disabled>Send</button>
+        </div>
+        <div class="status" id="status">Ready</div>
     </div>
-    
-    <div class="status" id="status">Ready</div>
 </div>
 
 <script>
-let ws, active, chats = {}, contacts = [];
+let active, chats = {}, contacts = [], pollInterval;
 
 function init() {
     contacts = JSON.parse(localStorage.getItem('anms_contacts') || '[]');
     chats = JSON.parse(localStorage.getItem('anms_chats') || '{}');
     renderContacts();
-    connectWS();
-}
-
-function connectWS() {
-    const host = window.location.hostname;
-    try {
-        ws = new WebSocket('ws://' + host + ':8765');
-        ws.onopen = () => updateStatus('Connected');
-        ws.onmessage = e => {
-            if (e.data.startsWith('INCOMING_SMS|')) {
-                const [_, phone, ...msgParts] = e.data.split('|');
-                const text = msgParts.join('|');
-                loadChat(phone).then(() => {
-                    if (active === phone) renderMsgs();
-                });
-            }
-        };
-        ws.onclose = () => { updateStatus('Offline'); setTimeout(connectWS, 3000); };
-        ws.onerror = () => updateStatus('Error');
-    } catch (e) {
-        updateStatus('WS Error');
-    }
 }
 
 function addContact() {
@@ -286,23 +512,33 @@ function selectContact(p) {
     renderContacts();
     document.getElementById('msg').disabled = false;
     document.getElementById('sendBtn').disabled = false;
-    loadChat(p).then(() => renderMsgs());
+    document.getElementById('chatHeader').textContent = p;
+    clearInterval(pollInterval);
+    loadChat(p).then(() => {
+        renderMsgs();
+        startPolling();
+    });
 }
 
 function loadChat(phone) {
-    updateStatus('Loading...');
     return fetch('http://' + window.location.hostname + ':8080/api/chat/' + encodeURIComponent(phone))
         .then(r => r.json())
         .then(data => {
             chats[phone] = data;
             localStorage.setItem('anms_chats', JSON.stringify(chats));
-            updateStatus('Ready');
             return data;
         })
         .catch(e => {
             updateStatus('Error loading');
             console.error('Load error:', e);
         });
+}
+
+function startPolling() {
+    if (!active) return;
+    pollInterval = setInterval(() => {
+        if (active) loadChat(active).then(() => renderMsgs());
+    }, 2000);
 }
 
 function send() {
@@ -321,7 +557,7 @@ function send() {
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            loadChat(active).then(() => renderMsgs());
+            setTimeout(() => loadChat(active).then(() => renderMsgs()), 500);
             updateStatus('Ready');
         } else {
             updateStatus('Send failed');
@@ -337,23 +573,29 @@ function send() {
 function renderContacts() {
     const html = contacts.map(p => {
         const cnt = (chats[p] || []).length;
-        return '<div class="contact ' + (active === p ? 'active' : '') + '" onclick="selectContact(\'' + p + '\')">' + p + ' (' + cnt + ')</div>';
+        return '<div class="contact ' + (active === p ? 'active' : '') + '" onclick="selectContact(\'' + p.replace(/'/g, "\\'") + '\')"><div class="contact-info"><div class="contact-phone">' + p + '</div><div class="contact-badge">' + cnt + ' messages</div></div></div>';
     }).join('');
-    document.getElementById('contacts').innerHTML = html || '<div style="color: #666;">No contacts</div>';
+    document.getElementById('contacts').innerHTML = html || '<div style="padding: 20px; text-align: center; color: #999; font-size: 14px;">No contacts yet</div>';
 }
 
 function renderMsgs() {
     const msgs = chats[active] || [];
-    const html = msgs.map(m => 
-        '<div><div class="msg ' + m.dir + '">' + m.body + '</div><div class="msg time">' + m.time + '</div></div>'
-    ).join('');
+    const html = msgs.map(m => {
+        return '<div class="message ' + m.dir + '"><div class="message-bubble">' + escapeHtml(m.body) + '</div><div class="message-time">' + m.time + '</div></div>';
+    }).join('');
     const c = document.getElementById('messages');
-    c.innerHTML = html || '<div style="color: #666; text-align: center; margin-top: 20px;">No messages</div>';
+    c.innerHTML = html || '<div class="empty-state">No messages yet</div>';
     c.scrollTop = c.scrollHeight;
 }
 
 function updateStatus(s) {
     document.getElementById('status').textContent = s;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 document.getElementById('msg').addEventListener('keypress', e => {
