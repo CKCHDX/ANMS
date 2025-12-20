@@ -652,7 +652,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             }
             
             .chat-header {
-                padding: 10px 8px;
+                padding: 8px;
                 font-size: 13px;
                 font-weight: 600;
                 gap: 8px;
@@ -660,7 +660,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             
             .chat-header-back {
                 display: block !important;
-                padding: 8px 12px;
+                padding: 6px 10px !important;
                 font-size: 12px;
                 flex-shrink: 0;
                 background: #4a9eff;
@@ -685,49 +685,73 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             }
             
             .messages-area {
-                padding: 8px;
-                gap: 6px;
-                font-size: 12px;
+                padding: 6px;
+                gap: 2px;
+                font-size: 11px;
+                flex-wrap: wrap;           /* ALLOW WRAPPING */
+                flex-direction: row;       /* SIDE-BY-SIDE instead of column */
             }
-            
+            .message-group {
+                display: flex;
+                margin-bottom: 0px;        /* was 4px */
+                animation: fadeIn 0.3s ease-out;
+                width: auto;               /* DONT TAKE FULL WIDTH */
+                max-width: 95%;            /* LIMIT WIDTH SO THEY DONT STRETCH */
+            }
+            .message-group.in {
+                justify-content: flex-start;
+                margin-right: auto;        /* PUSH RIGHT MESSAGES TO RIGHT */
+            }
+
+            .message-group.out {
+                justify-content: flex-end;
+                margin-left: auto;         /* PUSH LEFT MESSAGES TO LEFT */
+            }
             .message-bubble {
-                max-width: 90%;
-                padding: 8px 10px;
-                font-size: 12px;
+                max-width: 100%;           /* was 90% */
+                padding: 6px 8px;          /* was 8px 10px */
+                font-size: 11px;
                 border-radius: 8px;
                 word-break: break-word;
-                line-height: 1.3;
+                line-height: 1.25;
             }
-            
+            .message-group.in .message-time {
+                text-align: left;
+            }
+
+            .message-group.out .message-time {
+                text-align: right;
+            }
+
+
             .message-time {
-                font-size: 10px;
-                margin-top: 2px;
+               font-size: 9px;
+                margin-top: 1px;
+                display: block;            /* Make time appear below bubble */
             }
+
             
-            .input-section {
-                padding: 8px;
-                gap: 6px;
-                border-top: 1px solid #333;
+             .input-section {
+                padding: 6px;
+                gap: 4px;
             }
-            
+
             .input-section textarea {
-                padding: 8px;
-                font-size: 12px;
-                min-height: 32px;
-                max-height: 60px;
-                border-radius: 4px;
-            }
-            
-            .input-section button {
-                padding: 8px 12px;
+                padding: 6px;
                 font-size: 11px;
-                border-radius: 4px;
-                font-weight: 600;
+                min-height: 28px;
+                max-height: 56px;
             }
+
+            .input-section button {
+                padding: 6px 10px;
+                font-size: 10px;
+            }
+
             
             .status-bar {
-                padding: 6px 8px;
-                font-size: 11px;
+                padding: 4px 6px;
+                font-size: 10px;
             }
             
             .empty-state {
