@@ -487,7 +487,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             background: #505050;
         }
         
-        /* ==================== TABLET (768px - 1024px) ==================== */
+        /* ==================== DESKTOP (1024px+) ==================== */
         @media (max-width: 1024px) {
             .sidebar {
                 width: 240px;
@@ -509,7 +509,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             }
         }
         
-        /* ==================== PHONE (480px - 768px) ==================== */
+        /* ==================== TABLET (768px - 1024px) ==================== */
         @media (max-width: 768px) {
             .main {
                 flex-direction: column;
@@ -559,33 +559,30 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             }
         }
         
-        /* ==================== MINI PHONE / KEITAI (<480px, typically <3 inch) ==================== */
+        /* ==================== PHONE (480px - 768px) ==================== */
         @media (max-width: 480px) {
-            body {
-                background: #0f0f0f;
-            }
-            
             .main {
                 flex-direction: column;
-                height: auto;
+                height: 100vh;
             }
             
-            /* Hide sidebar by default, show only in contact selection mode */
+            /* Contact selection screen (visible by default on keitai) */
             .sidebar {
                 width: 100%;
-                max-height: none;
                 border: none;
                 padding: 8px;
                 gap: 8px;
             }
             
-            .sidebar.hidden {
+            /* Hide sidebar when chat is active on small screens */
+            .sidebar.chat-active {
                 display: none;
             }
             
             .sidebar-header {
                 font-size: 14px;
                 font-weight: 600;
+                padding: 4px 0;
             }
             
             .phone-input-group {
@@ -599,49 +596,59 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 padding: 10px 8px;
                 font-size: 12px;
                 border-radius: 4px;
+                grid-column: span 1;
             }
             
             .phone-input-group button {
                 padding: 10px 8px;
                 font-size: 12px;
                 border-radius: 4px;
-                width: 100%;
+                grid-column: span 1;
             }
             
             .contacts-list {
                 flex: none;
-                max-height: 300px;
+                max-height: 100%;
                 gap: 4px;
-                padding-bottom: 8px;
+                padding-bottom: 0;
+                overflow-y: auto;
             }
             
             .contact-item {
-                padding: 10px;
-                font-size: 12px;
+                padding: 12px;
+                font-size: 13px;
                 border-radius: 6px;
+                border: 1px solid #333;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            
+            .contact-item:active {
+                background: #303030;
             }
             
             .contact-number {
-                margin-bottom: 2px;
+                margin-bottom: 4px;
                 font-weight: 600;
-                font-size: 13px;
+                font-size: 14px;
             }
             
             .contact-count {
                 font-size: 11px;
+                opacity: 0.7;
             }
             
-            /* Chat takes full screen on keitai */
+            /* Chat container hidden by default, shown when contact selected */
             .chat-container {
+                display: none;
                 width: 100%;
                 height: 100vh;
-                min-height: 100vh;
                 flex: none;
                 border: none;
             }
             
-            .chat-container.hidden {
-                display: none;
+            .chat-container.chat-active {
+                display: flex;
             }
             
             .chat-header {
@@ -652,10 +659,21 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             }
             
             .chat-header-back {
-                display: block;
-                padding: 6px 10px;
-                font-size: 11px;
+                display: block !important;
+                padding: 8px 12px;
+                font-size: 12px;
                 flex-shrink: 0;
+                background: #4a9eff;
+                border: none;
+                color: #fff;
+                border-radius: 4px;
+                cursor: pointer;
+                font-weight: 600;
+                transition: all 0.2s;
+            }
+            
+            .chat-header-back:active {
+                transform: scale(0.95);
             }
             
             .chat-header-title {
@@ -663,6 +681,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
+                font-size: 13px;
             }
             
             .messages-area {
@@ -723,7 +742,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             }
             
             .chat-header-back {
-                padding: 6px 8px;
+                padding: 6px 8px !important;
                 font-size: 10px;
             }
             
@@ -750,11 +769,20 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 padding: 6px 10px;
                 font-size: 10px;
             }
+            
+            .contact-item {
+                padding: 10px !important;
+            }
+            
+            .contact-number {
+                font-size: 12px !important;
+            }
         }
     </style>
 </head>
 <body>
 <div class="main">
+    <!-- CONTACT SELECTION SCREEN (visible on keitai by default) -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">📱 Chats</div>
         <div class="phone-input-group">
@@ -764,6 +792,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
         <div class="contacts-list" id="contacts"></div>
     </div>
     
+    <!-- CHAT SCREEN (hidden on keitai until contact selected) -->
     <div class="chat-container" id="chatContainer">
         <div class="chat-header">
             <button class="chat-header-back" id="backBtn" onclick="goBack()">← Back</button>
@@ -780,20 +809,42 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
 
 <script>
 let ws, active, chats = {}, contacts = [], pollInterval, screenWidth = window.innerWidth;
+let deviceMode = 'desktop'; // 'desktop', 'tablet', 'phone', 'keitai'
 
 function detectScreenSize() {
     screenWidth = window.innerWidth;
-    console.log('Screen width:', screenWidth);
     
-    // Keitai mode: <480px
     if (screenWidth < 480) {
-        document.documentElement.setAttribute('data-mode', 'keitai');
+        deviceMode = 'keitai';
     } else if (screenWidth < 768) {
-        document.documentElement.setAttribute('data-mode', 'phone');
+        deviceMode = 'phone';
     } else if (screenWidth < 1024) {
-        document.documentElement.setAttribute('data-mode', 'tablet');
+        deviceMode = 'tablet';
     } else {
-        document.documentElement.setAttribute('data-mode', 'desktop');
+        deviceMode = 'desktop';
+    }
+    
+    console.log('Screen:', screenWidth + 'px, Mode:', deviceMode);
+    applyDeviceLayout();
+}
+
+function applyDeviceLayout() {
+    const sidebar = document.getElementById('sidebar');
+    const chatContainer = document.getElementById('chatContainer');
+    
+    if (deviceMode === 'keitai') {
+        // Keitai: Show contacts by default, chat replaces when selected
+        if (active) {
+            sidebar.classList.add('chat-active');
+            chatContainer.classList.add('chat-active');
+        } else {
+            sidebar.classList.remove('chat-active');
+            chatContainer.classList.remove('chat-active');
+        }
+    } else {
+        // Desktop/Tablet/Phone: Show both side by side (or stacked)
+        sidebar.classList.remove('chat-active');
+        chatContainer.classList.remove('chat-active');
     }
 }
 
@@ -801,44 +852,24 @@ function init() {
     detectScreenSize();
     window.addEventListener('resize', () => {
         detectScreenSize();
-        if (screenWidth >= 480 && active) {
-            document.getElementById('sidebar').classList.remove('hidden');
-            document.getElementById('chatContainer').classList.remove('hidden');
-        }
     });
     
     contacts = JSON.parse(localStorage.getItem('anms_contacts') || '[]');
     chats = JSON.parse(localStorage.getItem('anms_chats') || '{}');
     renderContacts();
     
-    if (screenWidth < 480 && contacts.length > 0) {
-        showContactSelectionScreen();
-    }
-    
     connectWS();
 }
 
-function showContactSelectionScreen() {
-    if (screenWidth < 480) {
-        document.getElementById('sidebar').classList.remove('hidden');
-        document.getElementById('chatContainer').classList.add('hidden');
-    }
-}
-
-function showChatScreen() {
-    if (screenWidth < 480) {
-        document.getElementById('sidebar').classList.add('hidden');
-        document.getElementById('chatContainer').classList.remove('hidden');
-    }
-}
-
 function goBack() {
+    // Keitai: Return to contact selection
     active = null;
     document.getElementById('msg').disabled = true;
     document.getElementById('sendBtn').disabled = true;
     document.getElementById('messages').innerHTML = '<div class="empty-state">👈 Select a contact to start chatting</div>';
     clearInterval(pollInterval);
-    showContactSelectionScreen();
+    
+    applyDeviceLayout();
     renderContacts();
 }
 
@@ -880,15 +911,13 @@ function addContact() {
 function selectContact(p) {
     console.log('Selecting contact:', p);
     active = p;
-    renderContacts();
     document.getElementById('msg').disabled = false;
     document.getElementById('sendBtn').disabled = false;
     document.getElementById('chatHeader').textContent = '📱 ' + p;
     clearInterval(pollInterval);
     
-    if (screenWidth < 480) {
-        showChatScreen();
-    }
+    applyDeviceLayout();
+    renderContacts();
     
     loadChat(p).then(() => {
         renderMsgs();
