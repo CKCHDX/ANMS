@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.provider.Telephony
+import android.telephony.SmsMessage
 import androidx.annotation.RequiresPermission
 import com.example.anms.Message
 
@@ -14,34 +15,48 @@ class SmsReceiver(
     @RequiresPermission(android.Manifest.permission.RECEIVE_SMS)
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
-            val smsMessages = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                Telephony.Sms.Intents.getMessagesFromIntent(intent)
-            } else {
-                @Suppress("DEPRECATION")
-                val pdus = intent.getParcelableArrayExtra("pdus") as? Array<*>
-                pdus?.mapNotNull { pdu ->
-                    try {
-                        @Suppress("DEPRECATION")
-                        android.telephony.SmsMessage.createFromPdu(pdu as ByteArray)
-                    } catch (e: Exception) {
-                        null
+            try {
+                val messages = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                    Telephony.Sms.Intents.getMessagesFromIntent(intent)
+                } else {
+                    // For older Android versions, parse PDU manually
+                    @Suppress("DEPRECATION")
+                    val pdus = intent.getParcelableArrayExtra("pdus")
+                    if (pdus != null) {
+                        val pduList = mutableListOf<SmsMessage>()
+                        for (pdu in pdus) {
+                            try {
+                                @Suppress("DEPRECATION")
+                                val msg = SmsMessage.createFromPdu(pdu as ByteArray)
+                                pduList.add(msg)
+                            } catch (e: Exception) {
+                                // Skip invalid PDUs
+                            }
+                        }
+                        pduList.toTypedArray()
+                    } else {
+                        emptyArray()
                     }
-                } ?: emptyList()
-            }
+                }
 
-            for (sms in smsMessages) {
-                val phoneNumber = sms.originatingAddress ?: "Unknown"
-                val messageBody = sms.messageBody
-                val timestamp = sms.timestampMillis
+                // Process each SMS message
+                for (sms in messages) {
+                    val phoneNumber = sms.originatingAddress ?: "Unknown"
+                    val messageBody = sms.messageBody
+                    val timestamp = sms.timestampMillis
 
-                onMessageReceived(
-                    Message(
-                        phoneNumber = phoneNumber,
-                        content = messageBody,
-                        timestamp = timestamp,
-                        isOutgoing = false
+                    onMessageReceived(
+                        Message(
+                            phoneNumber = phoneNumber,
+                            content = messageBody,
+                            timestamp = timestamp,
+                            isOutgoing = false
+                        )
                     )
-                )
+                }
+            } catch (e: Exception) {
+                // Log error but don't crash
+                e.printStackTrace()
             }
         }
     }
