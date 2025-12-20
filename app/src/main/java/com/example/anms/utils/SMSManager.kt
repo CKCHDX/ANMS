@@ -99,7 +99,8 @@ class SMSManager(private val context: Context) {
             )
             if (index < messages.size - 1) json.append(",")
         }
-        json.append("]}")        return json.toString()
+        json.append("]}")        
+        return json.toString()
     }
 
     data class SMSMessage(
