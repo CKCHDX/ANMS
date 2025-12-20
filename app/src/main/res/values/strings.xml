@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ANMS</string>
+    <string name="server_status">Server Status</string>
+    <string name="messages">Messages</string>
+    <string name="phone_number">Phone Number</string>
+    <string name="message">Message</string>
+    <string name="send_sms">Send SMS</string>
+</resources>
