@@ -1013,7 +1013,7 @@ function loadChat(phone) {
             // Store the new messages - FRESH load for this phone
             chats[phone] = data.messages;
             
-            // Initialize state with FRESH data
+            // Initialize state with FRESH data - mark all messages as seen
             messageState[phone] = {
                 total: data.total,
                 offset: MESSAGES_PER_LOAD,
@@ -1045,7 +1045,12 @@ function pollChat(phone) {
             console.log('Poll: Got', data.messages.length, 'messages (total:', data.total + ')');
             
             const state = messageState[phone];
-            if (!state) return;
+            if (!state) {
+                console.log('No state found for', phone);
+                return;
+            }
+            
+            console.log('State before: lastTotal=' + state.lastTotal + ', lastSeenCount=' + state.lastSeenCount);
             
             // Only update if TOTAL changed (new messages in the conversation)
             if (data.total > state.lastTotal) {
@@ -1053,6 +1058,8 @@ function pollChat(phone) {
                 // New messages arrived
                 const oldMessages = chats[phone] || [];
                 const newMessages = data.messages;
+                
+                console.log('Old message count:', oldMessages.length, 'New message count:', newMessages.length);
                 
                 // Replace the chats with fresh data from server
                 chats[phone] = newMessages;
@@ -1077,13 +1084,18 @@ function appendNewMessages() {
     if (!active) return;
     
     const state = messageState[active];
+    if (!state) return;
+    
     const msgs = chats[active] || [];
     const newCount = msgs.length;
     const prevCount = state.lastSeenCount || 0;
     
     console.log('appendNewMessages: prevCount=' + prevCount + ', newCount=' + newCount);
     
-    if (newCount <= prevCount) return; // No new messages
+    if (newCount <= prevCount) {
+        console.log('No new messages to append');
+        return; // No new messages
+    }
     
     // Add only new messages
     const area = document.getElementById('messages');
@@ -1105,6 +1117,8 @@ function appendNewMessages() {
     
     // Update count
     state.lastSeenCount = newCount;
+    
+    console.log('Updated lastSeenCount to:', newCount);
     
     // Auto-scroll only if user is at bottom
     if (isScrolledToBottom()) {
