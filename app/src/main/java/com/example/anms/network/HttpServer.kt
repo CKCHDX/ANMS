@@ -179,13 +179,15 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>ANMS - SMS Client</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
         }
         
         html, body {
@@ -195,6 +197,8 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             color: #e0e0e0;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             font-size: 15px;
+            position: fixed;
+            overflow: hidden;
         }
         
         body {
@@ -207,6 +211,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             height: 100vh;
             gap: 0;
             flex: 1;
+            width: 100%;
         }
         
         .sidebar {
@@ -256,6 +261,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             cursor: pointer;
             font-size: 13px;
             transition: all 0.2s;
+            -webkit-appearance: none;
         }
         
         .phone-input-group button:hover {
@@ -282,11 +288,16 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             cursor: pointer;
             transition: all 0.2s;
             font-size: 14px;
+            -webkit-appearance: none;
         }
         
         .contact-item:hover {
             background: #303030;
             border-color: #404040;
+        }
+        
+        .contact-item:active {
+            background: #4a9eff;
         }
         
         .contact-item.active {
@@ -336,6 +347,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             font-size: 12px;
             font-weight: 600;
             transition: all 0.2s;
+            -webkit-appearance: none;
         }
         
         .chat-header-back:active {
@@ -362,6 +374,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             text-align: center;
             transition: all 0.2s;
             margin: 8px 0;
+            -webkit-appearance: none;
         }
         
         .load-older-btn:hover {
@@ -465,6 +478,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             resize: none;
             max-height: 80px;
             min-height: 40px;
+            -webkit-appearance: none;
         }
         
         .input-section textarea:focus {
@@ -485,6 +499,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             white-space: nowrap;
             transition: all 0.2s;
             align-self: flex-end;
+            -webkit-appearance: none;
         }
         
         .input-section button:hover {
@@ -507,6 +522,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             font-size: 13px;
             color: #999;
             font-weight: 500;
+            flex-shrink: 0;
         }
         
         /* Scrollbar styling */
@@ -604,6 +620,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
             .main {
                 flex-direction: column;
                 height: 100vh;
+                width: 100%;
             }
             
             /* Contact selection screen (visible by default on keitai) */
@@ -644,6 +661,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 padding: 10px 8px;
                 font-size: 13px;
                 border-radius: 4px;
+                -webkit-appearance: none;
             }
             
             .phone-input-group button {
@@ -651,6 +669,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 padding: 10px 8px;
                 font-size: 12px;
                 border-radius: 4px;
+                -webkit-appearance: none;
             }
             
             .contacts-list {
@@ -670,6 +689,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 cursor: pointer;
                 transition: all 0.2s;
                 flex-shrink: 0;
+                -webkit-appearance: none;
             }
             
             .contact-item:active {
@@ -720,6 +740,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 cursor: pointer;
                 font-weight: 600;
                 transition: all 0.2s;
+                -webkit-appearance: none;
             }
             
             .chat-header-back:active {
@@ -797,11 +818,13 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
                 font-size: 12px;
                 min-height: 28px;
                 max-height: 50px;
+                -webkit-appearance: none;
             }
 
             .input-section button {
                 padding: 6px 10px;
                 font-size: 11px;
+                -webkit-appearance: none;
             }
             
             .status-bar {
@@ -906,6 +929,10 @@ const MESSAGES_PER_LOAD = 8;
 
 function detectScreenSize() {
     screenWidth = window.innerWidth;
+    console.log('DEBUG: window.innerWidth =', screenWidth);
+    console.log('DEBUG: window.outerWidth =', window.outerWidth);
+    console.log('DEBUG: screen.width =', screen.width);
+    console.log('DEBUG: devicePixelRatio =', window.devicePixelRatio);
     
     if (screenWidth < 480) {
         deviceMode = 'keitai';
@@ -917,7 +944,7 @@ function detectScreenSize() {
         deviceMode = 'desktop';
     }
     
-    console.log('Screen:', screenWidth + 'px, Mode:', deviceMode);
+    console.log('DETECTED: Screen Mode:', deviceMode, '(' + screenWidth + 'px)');
     applyDeviceLayout();
 }
 
