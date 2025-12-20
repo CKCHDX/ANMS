@@ -13,6 +13,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.anms.network.HttpServer
+import com.example.anms.network.WebSocketServer
 import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
@@ -20,6 +21,7 @@ class MainActivity : AppCompatActivity() {
     private val permissionRequestCode = 42
     
     private var httpServer: HttpServer? = null
+    private var wsServer: WebSocketServer? = null
     private var isServerRunning = false
     private var startTime: Long = 0
     private var messageCount = 0
@@ -89,7 +91,14 @@ class MainActivity : AppCompatActivity() {
         
         thread {
             try {
-                httpServer = HttpServer(this@MainActivity, 8080)
+                // Start WebSocket server (for incoming SMS)
+                wsServer = WebSocketServer(8765)
+                wsServer?.start()
+                Log.d(tag, "WebSocket Server started on port 8765")
+                Thread.sleep(500)
+                
+                // Start HTTP server (for sending SMS)
+                httpServer = HttpServer(this@MainActivity, 8080, wsServer)
                 httpServer?.start()
                 Log.d(tag, "HTTP Server started on port 8080")
                 
@@ -98,7 +107,7 @@ class MainActivity : AppCompatActivity() {
                 
                 runOnUiThread {
                     updateStatusUI()
-                    statusText.text = "Online - Open http://YOUR_IP:8080 in browser"
+                    statusText.text = "Online - Open http://YOUR_IP:8080"
                     statusDot.setBackgroundColor(android.graphics.Color.GREEN)
                 }
             } catch (e: Exception) {
@@ -115,6 +124,7 @@ class MainActivity : AppCompatActivity() {
         thread {
             try {
                 httpServer?.stopServer()
+                wsServer?.stopServer()
                 isServerRunning = false
                 messageCount = 0
                 
