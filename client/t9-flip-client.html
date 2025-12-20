@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ANMS T9 Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: monospace;
+            background: #111;
+            color: #fff;
+            font-size: 16px;
+            max-width: 240px;
+            margin: 0 auto;
+            line-height: 1.4;
+        }
+
+        .header {
+            background: #006699;
+            padding: 4px;
+            text-align: center;
+            border-bottom: 1px solid #004488;
+        }
+
+        .header h1 {
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .contact-info {
+            background: #222;
+            padding: 6px;
+            border-bottom: 1px solid #333;
+            font-size: 12px;
+        }
+
+        .contact-info p {
+            margin: 2px 0;
+        }
+
+        .status {
+            font-size: 11px;
+            color: #0f0;
+        }
+
+        .messages {
+            height: 200px;
+            overflow-y: auto;
+            background: #000;
+            padding: 4px;
+            margin: 4px 0;
+            border: 1px solid #333;
+            display: flex;
+            flex-direction: column-reverse;
+            gap: 2px;
+        }
+
+        .message {
+            padding: 4px;
+            border-radius: 2px;
+            word-wrap: break-word;
+            font-size: 12px;
+            line-height: 1.3;
+        }
+
+        .incoming {
+            background: #224;
+            color: #0f0;
+            text-align: left;
+        }
+
+        .outgoing {
+            background: #242;
+            color: #0f0;
+            text-align: right;
+        }
+
+        .timestamp {
+            font-size: 10px;
+            color: #666;
+            margin-top: 1px;
+        }
+
+        .input-section {
+            padding: 4px;
+            background: #1a1a1a;
+            border-top: 1px solid #333;
+        }
+
+        .t9-display {
+            background: #002;
+            padding: 4px;
+            margin-bottom: 4px;
+            border: 1px solid #003;
+            min-height: 20px;
+            font-size: 14px;
+            word-wrap: break-word;
+        }
+
+        .t9-candidates {
+            background: #003;
+            padding: 3px;
+            margin-bottom: 3px;
+            font-size: 11px;
+            color: #0f0;
+            min-height: 14px;
+        }
+
+        .keys-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2px;
+            margin-bottom: 2px;
+        }
+
+        .key {
+            background: #333;
+            border: 1px solid #555;
+            padding: 4px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: bold;
+            user-select: none;
+        }
+
+        .key:active {
+            background: #666;
+        }
+
+        .key-label {
+            font-size: 9px;
+            color: #888;
+        }
+
+        .soft-keys {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2px;
+            margin-top: 3px;
+        }
+
+        .soft-key {
+            background: #224;
+            border: 1px solid #446;
+            padding: 6px 2px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 10px;
+            font-weight: bold;
+            user-select: none;
+        }
+
+        .soft-key:active {
+            background: #448;
+        }
+
+        .status-bar {
+            background: #222;
+            padding: 3px;
+            font-size: 10px;
+            color: #888;
+            text-align: center;
+            border-top: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>SMS Chat</h1>
+    </div>
+
+    <div class="contact-info">
+        <p>To: <span id="phoneNumber">+1 (555) 000-0000</span></p>
+        <p class="status">Status: <span id="connectionStatus">Connecting...</span></p>
+    </div>
+
+    <div class="messages" id="messagesContainer"></div>
+
+    <div class="input-section">
+        <div class="t9-display" id="t9Display"></div>
+        <div class="t9-candidates" id="t9Candidates"></div>
+
+        <!-- Phone Keypad -->
+        <div class="keys-row">
+            <div class="key" data-key="1" onclick="pressKey(1)">1<br><span class="key-label">.</span></div>
+            <div class="key" data-key="2" onclick="pressKey(2)">2<br><span class="key-label">abc</span></div>
+            <div class="key" data-key="3" onclick="pressKey(3)">3<br><span class="key-label">def</span></div>
+        </div>
+        <div class="keys-row">
+            <div class="key" data-key="4" onclick="pressKey(4)">4<br><span class="key-label">ghi</span></div>
+            <div class="key" data-key="5" onclick="pressKey(5)">5<br><span class="key-label">jkl</span></div>
+            <div class="key" data-key="6" onclick="pressKey(6)">6<br><span class="key-label">mno</span></div>
+        </div>
+        <div class="keys-row">
+            <div class="key" data-key="7" onclick="pressKey(7)">7<br><span class="key-label">pqrs</span></div>
+            <div class="key" data-key="8" onclick="pressKey(8)">8<br><span class="key-label">tuv</span></div>
+            <div class="key" data-key="9" onclick="pressKey(9)">9<br><span class="key-label">wxyz</span></div>
+        </div>
+        <div class="keys-row">
+            <div class="key" data-key="*" onclick="pressKey('*')">*<br><span class="key-label">+</span></div>
+            <div class="key" data-key="0" onclick="pressKey(0)">0<br><span class="key-label">SPC</span></div>
+            <div class="key" data-key="#" onclick="pressKey('#')">#<br><span class="key-label">-</span></div>
+        </div>
+
+        <!-- Soft Keys -->
+        <div class="soft-keys">
+            <div class="soft-key" onclick="handleBack()">◀ Back</div>
+            <div class="soft-key" onclick="toggleMode()">Mode</div>
+            <div class="soft-key" onclick="sendMessage()">Send ▶</div>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <span id="messageCount">Messages: 0</span> | <span id="uptime">--:--</span>
+    </div>
+
+    <script>
+        const T9_KEYMAP = {
+            2: 'abc', 3: 'def', 4: 'ghi', 5: 'jkl', 6: 'mno',
+            7: 'pqrs', 8: 'tuv', 9: 'wxyz', 0: ' '
+        };
+
+        let currentText = '';
+        let currentKeyPresses = [];
+        let messageBuffer = [];
+        let ws = null;
+        let phoneNumber = 'Unknown';
+        let messages = [];
+        let messageCount = 0;
+        let inputMode = 'T9'; // T9 or Multi-tap
+        let lastPressTime = 0;
+        let lastPressedKey = null;
+
+        function initWebSocket() {
+            const host = window.location.hostname || '192.168.1.100';
+            const port = 8765;
+            ws = new WebSocket(`ws://${host}:${port}`);
+
+            ws.onopen = () => {
+                updateStatus('Connected');
+                console.log('Connected to ANMS');
+            };
+
+            ws.onmessage = (event) => {
+                console.log('Message from server:', event.data);
+                handleIncomingMessage(event.data);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                updateStatus('Error');
+            };
+
+            ws.onclose = () => {
+                updateStatus('Disconnected');
+                console.log('Disconnected from ANMS');
+                setTimeout(initWebSocket, 3000);
+            };
+        }
+
+        function handleIncomingMessage(data) {
+            if (!data.startsWith('INCOMING_SMS|')) return;
+
+            const parts = data.substring(13).split('|');
+            if (parts.length < 2) return;
+
+            const sender = parts[0];
+            const text = parts.slice(1).join('|');
+
+            phoneNumber = sender;
+            document.getElementById('phoneNumber').textContent = sender;
+
+            const timestamp = new Date().toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            });
+
+            messages.push({ text, type: 'incoming', time: timestamp });
+            messageCount++;
+            renderMessages();
+            updateMessageCount();
+        }
+
+        function pressKey(key) {
+            const now = Date.now();
+            const timeSinceLastPress = now - lastPressTime;
+
+            if (key === lastPressedKey && timeSinceLastPress < 1000) {
+                currentKeyPresses.push(key);
+            } else {
+                currentKeyPresses = [key];
+            }
+
+            lastPressTime = now;
+            lastPressedKey = key;
+
+            if (typeof key === 'number') {
+                const candidates = T9_KEYMAP[key] || '';
+                const index = (currentKeyPresses.length - 1) % candidates.length;
+                const char = candidates[index];
+                currentText = currentText.slice(0, -1) + char;
+                renderT9Display();
+            }
+        }
+
+        function handleBack() {
+            currentText = currentText.slice(0, -1);
+            currentKeyPresses = [];
+            lastPressedKey = null;
+            renderT9Display();
+        }
+
+        function toggleMode() {
+            inputMode = inputMode === 'T9' ? 'Multi-tap' : 'T9';
+            const elem = document.querySelectorAll('.soft-key')[1];
+            elem.textContent = inputMode === 'T9' ? 'T9' : 'Multi';
+        }
+
+        function sendMessage() {
+            if (!currentText.trim()) return;
+
+            const timestamp = new Date().toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            });
+
+            // Send to server
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const frame = `OUTGOING_SMS|${phoneNumber}|${currentText}|${timestamp}|true`;
+                console.log('Sending:', frame);
+                ws.send(frame);
+            }
+
+            messages.push({ text: currentText, type: 'outgoing', time: timestamp });
+            messageCount++;
+            currentText = '';
+            currentKeyPresses = [];
+            lastPressedKey = null;
+            renderMessages();
+            renderT9Display();
+            updateMessageCount();
+        }
+
+        function updateStatus(status) {
+            document.getElementById('connectionStatus').textContent = status;
+        }
+
+        function updateMessageCount() {
+            document.getElementById('messageCount').textContent = `Messages: ${messageCount}`;
+        }
+
+        function renderT9Display() {
+            document.getElementById('t9Display').textContent = currentText || '[empty]';
+        }
+
+        function renderMessages() {
+            const container = document.getElementById('messagesContainer');
+            container.innerHTML = messages.map(msg => `
+                <div class="message ${msg.type}">
+                    ${msg.text}
+                    <div class="timestamp">${msg.time}</div>
+                </div>
+            `).join('');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // Keyboard support for testing
+        document.addEventListener('keydown', (e) => {
+            if (e.key >= '0' && e.key <= '9') pressKey(parseInt(e.key));
+            if (e.key === '*') pressKey('*');
+            if (e.key === '#') pressKey('#');
+            if (e.key === 'Backspace') handleBack();
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        initWebSocket();
+        renderT9Display();
+        updateMessageCount();
+    </script>
+</body>
+</html>
