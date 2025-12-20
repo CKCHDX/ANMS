@@ -897,7 +897,7 @@ class HttpServer(val context: Context, private val port: Int = 8080, private val
 <script>
 let ws, active, chats = {}, contacts = [], pollInterval, screenWidth = window.innerWidth;
 let deviceMode = 'desktop'; // 'desktop', 'tablet', 'phone', 'keitai'
-let messageState = {}; // Track pagination state per contact: { phone: { total, offset, limit, loading } }
+let messageState = {}; // Track pagination state per contact: { phone: { total, offset, limit, loading, count } }
 const MESSAGES_PER_LOAD = 8;
 
 function detectScreenSize() {
@@ -974,7 +974,7 @@ function connectWS() {
                 const text = msgParts.join('|');
                 console.log('New SMS from:', phone, text);
                 loadChat(phone).then(() => {
-                    if (active === phone) renderMsgs();
+                    if (active === phone) appendNewMessages();
                 });
             }
         };
@@ -1007,7 +1007,7 @@ function selectContact(p) {
     
     // Initialize pagination state for this contact
     if (!messageState[p]) {
-        messageState[p] = { total: 0, offset: 0, loading: false };
+        messageState[p] = { total: 0, offset: 0, loading: false, count: 0 };
     }
     
     applyDeviceLayout();
@@ -1038,7 +1038,8 @@ function loadChat(phone) {
             messageState[phone] = {
                 total: data.total,
                 offset: MESSAGES_PER_LOAD,
-                loading: false
+                loading: false,
+                count: data.messages.length
             };
             
             localStorage.setItem('anms_chats', JSON.stringify(chats));
@@ -1049,6 +1050,42 @@ function loadChat(phone) {
             console.error('Load error:', e);
             updateStatus('✗ Error loading');
         });
+}
+
+function appendNewMessages() {
+    // Only append NEW messages, don't rebuild entire DOM
+    if (!active) return;
+    
+    const state = messageState[active];
+    const msgs = chats[active] || [];
+    const newCount = msgs.length;
+    const prevCount = state.count || 0;
+    
+    if (newCount <= prevCount) return; // No new messages
+    
+    // Add only new messages
+    const area = document.getElementById('messages');
+    const newMessages = msgs.slice(prevCount);
+    
+    const html = newMessages.map(m => {
+        const dirClass = m.dir === 'in' ? 'in' : 'out';
+        return '<div class="message-group ' + dirClass + '"><div><div class="message-bubble">' + escapeHtml(m.body) + '</div><div class="message-time">' + m.time + '</div></div></div>';
+    }).join('');
+    
+    // Append to DOM instead of replacing
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    while (tempDiv.firstChild) {
+        area.appendChild(tempDiv.firstChild);
+    }
+    
+    // Update count
+    state.count = newCount;
+    
+    // Auto-scroll only if user is at bottom
+    if (isScrolledToBottom()) {
+        area.scrollTop = area.scrollHeight;
+    }
 }
 
 function loadOlderMessages() {
@@ -1070,6 +1107,7 @@ function loadOlderMessages() {
             chats[active] = data.messages.concat(chats[active]);
             state.offset += MESSAGES_PER_LOAD;
             state.loading = false;
+            state.count = chats[active].length;
             localStorage.setItem('anms_chats', JSON.stringify(chats));
             renderMsgs();
         })
@@ -1091,10 +1129,7 @@ function startPolling() {
     pollInterval = setInterval(() => {
         if (active) {
             loadChat(active).then(() => {
-                const msgCount = (chats[active] || []).length;
-                console.log('Poll update: ' + msgCount + ' messages');
-                // Only scroll to bottom if user was already at bottom
-                renderMsgs(isScrolledToBottom());
+                appendNewMessages();
             }).catch(e => console.error('Poll error:', e));
         }
     }, 1000);
@@ -1120,7 +1155,7 @@ function send() {
         document.getElementById('sendBtn').disabled = false;
         if (data.success) {
             updateStatus('✓ Sent');
-            setTimeout(() => loadChat(active).then(() => renderMsgs(true)), 1000);
+            setTimeout(() => loadChat(active).then(() => appendNewMessages()), 1000);
         } else {
             updateStatus('✗ Send failed: ' + data.message);
         }
@@ -1141,19 +1176,20 @@ function renderContacts() {
     document.getElementById('contacts').innerHTML = html || '<div style="color: #666; text-align: center; padding: 20px; font-size: 12px;">No contacts yet</div>';
 }
 
-function renderMsgs(shouldScroll = false) {
+function renderMsgs() {
+    // Full rebuild (only on initial load or when loading older messages)
     const msgs = chats[active] || [];
     if (!msgs.length) {
         document.getElementById('messages').innerHTML = '<div class="empty-state">No messages yet</div>';
         return;
     }
     
-    const state = messageState[active] || { total: msgs.length, offset: 0 };
+    const state = messageState[active] || { total: msgs.length, offset: 0, count: 0 };
     let html = '';
     
     // Show "Load older" button if there are more messages
     if (state.offset < state.total) {
-        html += '<button id="loadOlderBtn" class="load-older-btn" onclick="loadOlderMessages()">\u2191 Load older messages</button>';
+        html += '<button id="loadOlderBtn" class="load-older-btn" onclick="loadOlderMessages()">↑ Load older messages</button>';
     }
     
     html += msgs.map(m => {
@@ -1163,11 +1199,8 @@ function renderMsgs(shouldScroll = false) {
     
     const area = document.getElementById('messages');
     area.innerHTML = html;
-    
-    // Only auto-scroll if user was at bottom or explicitly requested
-    if (shouldScroll) {
-        area.scrollTop = area.scrollHeight;
-    }
+    state.count = msgs.length;
+    area.scrollTop = area.scrollHeight;
 }
 
 function updateStatus(s) {
