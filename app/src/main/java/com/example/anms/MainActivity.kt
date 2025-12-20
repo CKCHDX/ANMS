@@ -14,6 +14,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.anms.network.HttpServer
 import com.example.anms.network.WebSocketServer
+import com.example.anms.sms.SmsReceiver
 import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
@@ -94,6 +95,7 @@ class MainActivity : AppCompatActivity() {
                 // Start WebSocket server (for incoming SMS)
                 wsServer = WebSocketServer(8765)
                 wsServer?.start()
+                SmsReceiver.wsServer = wsServer // Set reference for SMS receiver
                 Log.d(tag, "WebSocket Server started on port 8765")
                 Thread.sleep(500)
                 
@@ -125,6 +127,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 httpServer?.stopServer()
                 wsServer?.stopServer()
+                SmsReceiver.wsServer = null
                 isServerRunning = false
                 messageCount = 0
                 
