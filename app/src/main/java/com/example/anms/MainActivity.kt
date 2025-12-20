@@ -10,14 +10,13 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.View
+import android.view.View
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.anms.network.HttpServer
 import com.example.anms.network.WebSocketServer
-import kotlinx.coroutines.delay
 import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
@@ -121,11 +120,11 @@ class MainActivity : AppCompatActivity() {
         
         thread {
             try {
-                httpServer = HttpServer(this, 8080)
+                httpServer = HttpServer(this@MainActivity, 8080)
                 httpServer?.start()
                 Log.d(tag, "HTTP Server started")
                 
-                wsServer = WebSocketServer(this, 8765) { message ->
+                wsServer = WebSocketServer(this@MainActivity, 8765) { message ->
                     messageCount++
                     updateStatsUI()
                 }
@@ -138,13 +137,13 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     updateStatusUI()
                     statusText.text = "Online"
-                    statusDot.setBackgroundColor(ContextCompat.getColor(this@MainActivity, android.R.color.holo_green_light))
+                    statusDot.setBackgroundColor(android.graphics.Color.GREEN)
                 }
             } catch (e: Exception) {
                 Log.e(tag, "Error starting servers", e)
                 runOnUiThread {
                     statusText.text = "Error"
-                    statusDot.setBackgroundColor(ContextCompat.getColor(this@MainActivity, android.R.color.holo_red_light))
+                    statusDot.setBackgroundColor(android.graphics.Color.RED)
                 }
             }
         }
@@ -162,7 +161,8 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     updateStatusUI()
                     statusText.text = "Offline"
-                    statusDot.setBackgroundColor(ContextCompat.getColor(this@MainActivity, android.R.color.holo_red_light))
+                    statusDot.setBackgroundColor(android.graphics.Color.RED)
+                    uptimeText.text = "0s"
                 }
             } catch (e: Exception) {
                 Log.e(tag, "Error stopping servers", e)
@@ -184,24 +184,24 @@ class MainActivity : AppCompatActivity() {
         logsTab.visibility = View.GONE
         smsTab.visibility = View.GONE
         
-        // Reset button colors
-        messagesTabBtn.setBackgroundColor(ContextCompat.getColor(this, android.R.color.darker_gray))
-        logsTabBtn.setBackgroundColor(ContextCompat.getColor(this, android.R.color.darker_gray))
-        smsTabBtn.setBackgroundColor(ContextCompat.getColor(this, android.R.color.darker_gray))
+        // Reset button colors to gray
+        messagesTabBtn.setBackgroundColor(android.graphics.Color.LTGRAY)
+        logsTabBtn.setBackgroundColor(android.graphics.Color.LTGRAY)
+        smsTabBtn.setBackgroundColor(android.graphics.Color.LTGRAY)
         
         // Show selected tab and highlight button
         when (tabIndex) {
             0 -> {
                 messagesTab.visibility = View.VISIBLE
-                messagesTabBtn.setBackgroundColor(ContextCompat.getColor(this, android.R.color.holo_blue_light))
+                messagesTabBtn.setBackgroundColor(android.graphics.Color.parseColor("#667eea"))
             }
             1 -> {
                 logsTab.visibility = View.VISIBLE
-                logsTabBtn.setBackgroundColor(ContextCompat.getColor(this, android.R.color.holo_blue_light))
+                logsTabBtn.setBackgroundColor(android.graphics.Color.parseColor("#667eea"))
             }
             2 -> {
                 smsTab.visibility = View.VISIBLE
-                smsTabBtn.setBackgroundColor(ContextCompat.getColor(this, android.R.color.holo_blue_light))
+                smsTabBtn.setBackgroundColor(android.graphics.Color.parseColor("#667eea"))
             }
         }
     }
