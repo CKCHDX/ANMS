@@ -5,59 +5,51 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.provider.Telephony
-import android.telephony.SmsMessage
-import androidx.annotation.RequiresPermission
-import com.example.anms.Message
+import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import java.io.OutputStream
+import java.net.Socket
 
-class SmsReceiver(
-    private val onMessageReceived: (Message) -> Unit
-) : BroadcastReceiver() {
-    @RequiresPermission(android.Manifest.permission.RECEIVE_SMS)
+class SmsReceiver : BroadcastReceiver() {
+    private val tag = "ANMS_SmsReceiver"
+
     override fun onReceive(context: Context, intent: Intent) {
+        Log.d(tag, "SMS received")
+        
         if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
-            try {
-                val messages = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                    Telephony.Sms.Intents.getMessagesFromIntent(intent)
-                } else {
-                    // For older Android versions, parse PDU manually
-                    @Suppress("DEPRECATION")
-                    val pdus = intent.getParcelableArrayExtra("pdus")
-                    if (pdus != null) {
-                        val pduList = mutableListOf<SmsMessage>()
-                        for (pdu in pdus) {
-                            try {
-                                @Suppress("DEPRECATION")
-                                val msg = SmsMessage.createFromPdu(pdu as ByteArray)
-                                pduList.add(msg)
-                            } catch (e: Exception) {
-                                // Skip invalid PDUs
-                            }
-                        }
-                        pduList.toTypedArray()
-                    } else {
-                        emptyArray()
-                    }
+            val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
+            for (message in messages) {
+                val phoneNumber = message.originatingAddress ?: ""
+                val messageText = message.messageBody ?: ""
+                val timestamp = message.timestampMillis
+                
+                Log.d(tag, "SMS from $phoneNumber: $messageText")
+                
+                // Send to HTTP server
+                CoroutineScope(Dispatchers.IO).launch {
+                    sendToServer(phoneNumber, messageText, timestamp)
                 }
-
-                // Process each SMS message
-                for (sms in messages) {
-                    val phoneNumber = sms.originatingAddress ?: "Unknown"
-                    val messageBody = sms.messageBody
-                    val timestamp = sms.timestampMillis
-
-                    onMessageReceived(
-                        Message(
-                            phoneNumber = phoneNumber,
-                            content = messageBody,
-                            timestamp = timestamp,
-                            isOutgoing = false
-                        )
-                    )
-                }
-            } catch (e: Exception) {
-                // Log error but don't crash
-                e.printStackTrace()
             }
+        }
+    }
+
+    private fun sendToServer(phone: String, text: String, time: Long) {
+        try {
+            Log.d(tag, "Sending SMS notification to server: $phone: $text")
+            val socket = Socket("127.0.0.1", 8765)
+            val output = socket.outputStream
+            
+            // Send as simple text message
+            val message = "INCOMING_SMS|$phone|$text|$time"
+            output.write(message.toByteArray())
+            output.flush()
+            socket.close()
+            
+            Log.d(tag, "Sent to server successfully")
+        } catch (e: Exception) {
+            Log.e(tag, "Error sending to server: ${e.message}")
         }
     }
 }
