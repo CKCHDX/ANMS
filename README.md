@@ -1,6 +1,6 @@
 # ANMS - Aquos Network Messaging System
 
-ANMS enables the **Aquos A207SH** (a feature phone with WiFi but no SIM) to function as a **remote SMS terminal** connected to a **host device (Z Fold 6)** with a SIM card. It provides a seamless chat experience where the A207SH user can send and receive real SMS messages as if the A207SH had its own SIM card.
+ANMS enables (a feature phone with WiFi but no SIM) to function as a **remote SMS terminal** connected to a **host device** with a SIM card. It provides a seamless chat experience where the user can send and receive real SMS messages as if the feature phone had its own SIM card.
 
 ## Features
 
@@ -14,7 +14,7 @@ ANMS enables the **Aquos A207SH** (a feature phone with WiFi but no SIM) to func
 - 🎨 Clean and intuitive material design UI
 
 ### Client Application (Web)
-- 🌍 Browser-based interface for Aquos A207SH
+- 🌍 Browser-based interface for Feature phone
 - 🔐 Secure WebSocket connection to host
 - 📱 Responsive design optimized for small screens
 - 🔄 Persistent connection with auto-reconnect
@@ -24,37 +24,37 @@ ANMS enables the **Aquos A207SH** (a feature phone with WiFi but no SIM) to func
 ## Architecture
 
 ```
-┌────────────────────────────────────────────┐
-│   Aquos A207SH (WiFi enabled)              │
-│   ┌──────────────────────────────────────┐ │
-│   │   Web Browser Client                  │ │
-│   │   (HTML/CSS/JavaScript)               │ │
-│   └──────────────────────┬────────────────┘ │
-│                          │                  │
-│              WebSocket (WiFi)               │
-│                          │                  │
+┌──────────────────────────────────────────────┐
+│   Feature Phone (WiFi enabled)               │
+│   ┌────────────────────────────────────────┐ │
+│   │   Web Browser Client                   │ │
+│   │   (HTML/CSS/JavaScript)                │ │
+│   └──────────────────────┬─────────────────┘ │
+│                          │                   │
+│              WebSocket (WiFi)                │
+│                          │                   │
 └──────────────────────────┼───────────────────┘
                            │
                            │
 ┌──────────────────────────▼───────────────────┐
-│   Z Fold 6 (With SIM card)                   │
-│   ┌──────────────────────────────────────┐  │
+│   Primary Phone (With SIM card)              │
+│   ┌───────────────────────────────────────┐  │
 │   │  Android Host App                     │  │
-│   │  ┌──────────────────────────────────┐│  │
-│   │  │ WebSocket Server (8765)          ││  │
-│   │  └──────────────────────────────────┘│  │
-│   │  ┌──────────────────────────────────┐│  │
-│   │  │ SMS Manager                      ││  │
-│   │  │ - Send/Receive SMS               ││  │
-│   │  │ - Real-time updates              ││  │
-│   │  └──────────────────────────────────┘│  │
-│   │  ┌──────────────────────────────────┐│  │
-│   │  │ Message History                  ││  │
-│   │  └──────────────────────────────────┘│  │
-│   └──────────────────────────────────────┘  │
+│   │  ┌───────────────────────────────────┐│  │
+│   │  │ WebSocket Server (8765)           ││  │
+│   │  └───────────────────────────────────┘│  │
+│   │  ┌───────────────────────────────────┐│  │
+│   │  │ SMS Manager                       ││  │
+│   │  │ - Send/Receive SMS                ││  │
+│   │  │ - Real-time updates               ││  │
+│   │  └───────────────────────────────────┘│  │
+│   │  ┌───────────────────────────────────┐│  │
+│   │  │ Message History                   ││  │
+│   │  └───────────────────────────────────┘│  │
+│   └───────────────────────────────────────┘  │
 │   │         ▼                                │
-│   │    [SIM Card / GSM Network]             │
-└───────────────────────────────────────────┘
+│   │    [SIM Card / GSM Network]              │
+└──────────────────────────────────────────────┘
 ```
 
 ## Project Structure
@@ -97,7 +97,7 @@ ANMS/
 
 ## Setup Instructions
 
-### Host Device (Z Fold 6)
+### Host Device
 
 1. **Clone and setup in Android Studio**
    ```bash
@@ -107,7 +107,7 @@ ANMS/
 
 2. **Build and install the APK**
    - Open the project in Android Studio
-   - Connect your Z Fold 6 via USB or use an emulator
+   - Connect your phone via USB or use an emulator
    - Click "Run" or use: `./gradlew installDebug`
 
 3. **Grant required permissions**
@@ -121,7 +121,7 @@ ANMS/
 
 ### Client Device (Aquos A207SH)
 
-1. **Connect to the same WiFi network** as the Z Fold 6
+1. **Connect to the same WiFi network** as the phone
 
 2. **Open a browser** (Opera Mini, UC Browser, or native browser)
 
@@ -153,7 +153,7 @@ ANMS/
 ```
 <PHONE_NUMBER>|<MESSAGE_BODY>
 ```
-Example: `+46701234567|Hello from A207SH!`
+Example: `+46701234567|Hello from FP!`
 
 **Message Format (Host → Client)**:
 ```
