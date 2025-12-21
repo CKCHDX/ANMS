@@ -1,0 +1,1 @@
+// Placeholder - theme colors are defined in colors.xml

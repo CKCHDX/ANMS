@@ -1,0 +1,1 @@
+// Placeholder - theme is defined in themes.xml
